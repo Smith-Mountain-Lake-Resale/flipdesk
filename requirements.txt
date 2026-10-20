@@ -1,0 +1,12 @@
+fastapi==0.148.0
+uvicorn[standard]==0.53.0
+SQLAlchemy==2.1.5
+Jinja2==3.1.6
+python-multipart==0.0.32
+httpx==0.28.1
+APScheduler==3.11.3
+itsdangerous==2.2.0
+PyYAML==6.0.3
+cryptography==50.0.1
+psycopg[binary]==3.3.6
+PyMySQL==1.2.3
