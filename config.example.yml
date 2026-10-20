@@ -23,6 +23,21 @@ ebay:
   marketplace_id: EBAY_US
   # verification_token: generated automatically if not set (32-80 chars)
 
+# ---- security
+# mfa_required: true             # everyone must set up an authenticator app
+# mfa_required_for_oidc: false   # trust your IdP's MFA for SSO users
+# oidc:
+#   enabled: true
+#   display_name: Authentik
+#   issuer: https://auth.example.com/application/o/flipdesk/
+#   client_id: flipdesk
+#   client_secret: xxxxxxxx
+#   scopes: openid email profile groups
+#   auto_create: true
+#   allowed_groups: flipdesk-users,flipdesk-admins
+#   admin_groups: flipdesk-admins
+#   disable_password_login: false
+
 # ---- optional
 # secret_key: set your own instead of the auto-generated /config/secret.key
 # auth_mode: local            # local (login page) | none (only behind an authenticating reverse proxy!)
