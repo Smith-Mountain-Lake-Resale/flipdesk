@@ -137,5 +137,7 @@ def run_async(name: str) -> None:
 
 
 def shutdown() -> None:
-    if _sched:
+    global _sched
+    if _sched is not None and _sched.running:
         _sched.shutdown(wait=False)
+    _sched = None
