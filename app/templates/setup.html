@@ -7,11 +7,16 @@
     <h2>Create your admin account</h2>
     <p class="sub">This is a fresh install. The account you create here protects the web UI. Next you'll connect your eBay developer keys.</p>
     {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+    {% if oidc %}
+      <a class="btn primary" style="width:100%;justify-content:center" href="/auth/oidc/login">Create it by signing in with {{ oidc_name }}</a>
+      <div class="muted small" style="text-align:center;margin:14px 0 4px">The first SSO user becomes the admin. Or create a local account:</div>
+    {% endif %}
     <form method="post" action="/setup">{{ csrf_input() }}
-      <div class="field"><label>Username</label><input type="text" name="username" value="{{ username or '' }}" autofocus></div>
+      <div class="field"><label>Username</label><input type="text" name="username" value="{{ username or '' }}" {{ 'autofocus' if not oidc }}></div>
+      <div class="field"><label>Email (optional — used to link SSO later)</label><input type="email" name="email"></div>
       <div class="field"><label>Password (8+ characters)</label><input type="password" name="password" autocomplete="new-password"></div>
       <div class="field"><label>Confirm password</label><input type="password" name="password2" autocomplete="new-password"></div>
-      <button class="btn primary" style="width:100%;justify-content:center">Create account</button>
+      <button class="btn {{ '' if oidc else 'primary' }}" style="width:100%;justify-content:center">Create account</button>
     </form>
   </div>
 </div>

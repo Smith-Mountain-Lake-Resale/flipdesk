@@ -10,3 +10,6 @@ PyYAML==6.0.3
 cryptography==50.0.1
 psycopg[binary]==3.3.6
 PyMySQL==1.2.3
+pyotp==2.10.0
+qrcode==8.2
+PyJWT[crypto]==2.14.0

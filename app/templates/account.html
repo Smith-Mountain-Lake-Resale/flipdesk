@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}My account{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>My account</h1><div class="sub">{{ u.username }}{% if u.is_admin %} · admin{% endif %} · signed in with {{ 'single sign-on' if method == 'oidc' else 'password' }}{% if u.last_login %} · last sign-in {{ u.last_login|dt('%Y-%m-%d %H:%M') }} UTC{% endif %}</div></div></div>
+<div class="grid g2">
+  <div>
+    <div class="card" id="mfa">
+      <h2>Two-factor authentication</h2>
+      {% if u.totp_enabled %}
+        <p><span class="pill ok">On</span> Authenticator app added {{ u.totp_enabled_at|dt }}. {{ left }} recovery code{{ '' if left == 1 else 's' }} left.</p>
+        {% if left <= 3 %}<div class="note warn">You're running low on recovery codes — generate a new set.</div>{% endif %}
+        {% if method == 'oidc' and oidc_trusted %}<p class="small muted">When you sign in with SSO, your identity provider's MFA is used instead; this authenticator protects password sign-in.</p>{% endif %}
+        <form method="post" action="/account/mfa/recovery" class="row" style="margin-top:10px">{{ csrf_input() }}
+          <input type="text" name="code" inputmode="numeric" maxlength="7" placeholder="Current 6-digit code" style="width:180px" class="mono" autocomplete="one-time-code">
+          <button class="btn">New recovery codes</button>
+        </form>
+        <form method="post" action="/account/mfa/disable" class="row" style="margin-top:10px" data-confirm="{{ 'Remove this authenticator? You will set up a new one right away.' if required else 'Turn off two-factor authentication?' }}">{{ csrf_input() }}
+          <input type="text" name="code" placeholder="Code or recovery code" style="width:180px" class="mono" autocomplete="off">
+          <button class="btn danger">{{ 'Replace authenticator' if required else 'Turn off' }}</button>
+        </form>
+      {% else %}
+        <p><span class="pill {{ 'error' if required else 'unlisted' }}">Off</span> Protect your account with a 6-digit code from an authenticator app such as Google Authenticator, Microsoft Authenticator, Authy, 1Password or Bitwarden.</p>
+        {% if required and method == 'oidc' and oidc_trusted %}<p class="small muted">Not required for SSO sign-in (your identity provider handles MFA), but recommended if you also use a password.</p>{% endif %}
+        <a class="btn primary" href="/account/mfa">Set up authenticator</a>
+      {% endif %}
+    </div>
+    <div class="card">
+      <h2>Sessions</h2>
+      <p class="sub">Signs you out on every other browser and device. Changing your password does this automatically.</p>
+      <form method="post" action="/account/sign-out-everywhere">{{ csrf_input() }}<button class="btn">Sign out other sessions</button></form>
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <h2>Profile</h2>
+      <form method="post" action="/account/profile">{{ csrf_input() }}
+        <div class="field"><label>Display name</label><input type="text" name="display_name" value="{{ u.display_name or '' }}"></div>
+        <div class="field"><label>Email</label><input type="email" name="email" value="{{ u.email or '' }}" {{ 'disabled' if u.auth_source == 'oidc' }}>
+          <div class="help">{% if u.auth_source == 'oidc' %}Managed by your identity provider.{% else %}Used to link your account the first time you sign in with SSO.{% endif %}</div></div>
+        <button class="btn">Save</button>
+      </form>
+      {% if u.oidc_sub %}<p class="small muted" style="margin-top:10px">Linked to single sign-on identity <span class="mono">{{ u.oidc_sub }}</span> at {{ u.oidc_issuer }}.</p>{% endif %}
+    </div>
+    <div class="card">
+      <h2>{{ 'Change password' if u.has_password else 'Set a local password' }}</h2>
+      {% if not u.has_password %}<p class="sub">Optional. Lets you sign in with a password if SSO is unavailable (when password login is enabled).</p>{% endif %}
+      <form method="post" action="/account/password">{{ csrf_input() }}
+        {% if u.has_password %}<div class="field"><label>Current password</label><input type="password" name="current" autocomplete="current-password"></div>{% endif %}
+        <div class="field"><label>New password</label><input type="password" name="new" autocomplete="new-password"></div>
+        <div class="field"><label>Confirm new password</label><input type="password" name="new2" autocomplete="new-password"></div>
+        <button class="btn primary">{{ 'Change password' if u.has_password else 'Set password' }}</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

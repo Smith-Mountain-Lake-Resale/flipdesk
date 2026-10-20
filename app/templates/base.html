@@ -12,7 +12,9 @@
 {%- set m = match or href -%}
 <a href="{{ href }}" class="{{ 'on' if (path == m or (not exact and m != '/' and path.startswith(m))) else '' }}"><span>{{ label }}</span>{% if badge %}<span class="badge">{{ badge }}</span>{% endif %}</a>
 {%- endmacro %}
-{% if user %}
+{% if user and enrolling %}
+<main class="main" style="max-width:900px;margin:0 auto">{% for kind, msg in flashes %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}{{ self.content() }}</main>
+{% elif user %}
 <div class="layout">
   <aside class="side">
     <div class="brand"><span class="dot">⇄</span>{{ APP_NAME }}</div>
@@ -32,11 +34,15 @@
       {{ nav('/automations', 'Relist · reprice · promote') }}
       {{ nav('/issues', 'Error detection') }}
       {{ nav('/notifications', 'Alerts', badge=unread if unread else None) }}
-      <div class="sec">System</div>
+      <div class="sec">{{ 'System' if admin else 'You' }}</div>
+      {% if admin %}
       {{ nav('/settings/ebay', 'eBay connection') }}
       {{ nav('/settings', 'Settings', exact=True) }}
       {{ nav('/data', 'Import · export · backup') }}
-      {% if auth_mode != 'none' %}<a href="/logout"><span>Sign out ({{ user }})</span></a>{% endif %}
+      {% endif %}
+      {% if auth_mode != 'none' %}
+      {{ nav('/account', 'My account') }}
+      <a href="/logout"><span>Sign out ({{ user }})</span></a>{% endif %}
     </nav>
   </aside>
   <main class="main">

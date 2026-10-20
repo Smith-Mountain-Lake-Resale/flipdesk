@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}{% from "_m.html" import copy_field %}
+{% block title %}Set up two-factor{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Set up two-factor authentication</h1><div class="sub">Takes about a minute.</div></div>{% if not must_enroll %}<a class="btn" href="/account">Cancel</a>{% endif %}</div>
+{% if must_enroll %}<div class="note warn"><b>Your administrator requires two-factor authentication.</b> Set up an authenticator to continue using {{ APP_NAME }}. <a href="/logout">Sign out</a></div>{% endif %}
+<div class="card" style="max-width:760px">
+  <div class="grid g2" style="align-items:start">
+    <div>
+      <h3>1 · Scan this code</h3>
+      <p class="sub">In Google Authenticator, Microsoft Authenticator, Authy, 1Password, Bitwarden or similar, add an account and scan:</p>
+      <div style="background:#fff;padding:10px;border-radius:10px;width:220px;height:220px;display:grid;place-items:center" class="qr">{{ qr|safe }}</div>
+      <style>.qr svg{width:200px;height:200px}</style>
+    </div>
+    <div>
+      <h3>Can't scan?</h3>
+      <p class="sub">Enter this key manually (time-based, 6 digits, 30 seconds):</p>
+      {{ copy_field('totp_secret', secret) }}
+      <p class="small muted" style="margin-top:8px">On a phone? <a href="{{ uri }}">Open in authenticator app</a></p>
+      <h3 style="margin-top:18px">2 · Enter the 6-digit code</h3>
+      <form method="post" action="/account/mfa">{{ csrf_input() }}
+        <div class="field"><input type="text" name="code" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" autofocus autocomplete="one-time-code" class="mono" style="font-size:22px;letter-spacing:.2em;text-align:center"></div>
+        <button class="btn primary">Verify &amp; turn on</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

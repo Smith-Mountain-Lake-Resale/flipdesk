@@ -18,6 +18,15 @@ services:
       # EBAY_CLIENT_ID: YourName-FlipDesk-PRD-xxxxxxxx-xxxxxxxx
       # EBAY_CLIENT_SECRET: PRD-xxxxxxxxxxxx-xxxx-xxxx-xxxx-xxxx
       # EBAY_RUNAME: Your_Name-YourName-FlipDe-xxxxxxxx
+      # SESSION_COOKIE_SECURE: "true"   # when only served over HTTPS
+      # MFA_REQUIRED: "true"
+      # Single sign-on (or configure in Settings → Single sign-on):
+      # OIDC_ENABLED: "true"
+      # OIDC_DISPLAY_NAME: Authentik
+      # OIDC_ISSUER: https://auth.example.com/application/o/flipdesk/
+      # OIDC_CLIENT_ID: flipdesk
+      # OIDC_CLIENT_SECRET: xxxxxxxx
+      # OIDC_ADMIN_GROUPS: flipdesk-admins
     volumes:
       - ./data:/data          # database, photos, receipts, backups
       - ./config:/config      # config.yml (optional) + secret.key (auto-generated, keep it!)

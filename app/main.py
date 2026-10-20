@@ -4,7 +4,7 @@ import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
@@ -12,7 +12,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import config, settings
 from .db import SessionLocal, init_db
 from .models import Notification, User
-from .web import BASE, current_user, is_public, login_redirect, render
+from .services import authn
+from .web import ADMIN_PATHS, BASE, ENROLL_PATHS, is_public, login_redirect, render
 
 
 @asynccontextmanager
@@ -43,18 +44,32 @@ async def auth_guard(request: Request, call_next):
     if is_public(path):
         return await call_next(request)
     if config.AUTH_MODE != "none":
-        if current_user(request) is None:
-            db = SessionLocal()
-            try:
+        db = SessionLocal()
+        try:
+            uid = request.session.get("uid")
+            user = db.get(User, uid) if uid else None
+            if user is None:
                 has_users = db.query(User.id).first() is not None
-            finally:
-                db.close()
-            if not has_users:
-                from fastapi.responses import RedirectResponse
+            else:
+                db.expunge(user)
+        finally:
+            db.close()
+        # unknown, disabled or signed-out-everywhere sessions are dropped
+        if user is None or user.is_active is False or (user.session_epoch or 0) != request.session.get("epoch", 0):
+            if uid:  # stale/revoked session — drop it (but keep a pending MFA sign-in intact)
+                request.session.clear()
+            if user is None and not has_users:
                 return RedirectResponse("/setup", status_code=303)
             if path.startswith("/api/"):
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
             return login_redirect(request)
+        request.state.user = user
+        if authn.must_enroll(user, request.session.get("method", "password")):
+            request.state.must_enroll = True
+            if not any(path.startswith(p) for p in ENROLL_PATHS):
+                return RedirectResponse("/account/mfa?required=1", status_code=303)
+        if any(path.startswith(p) for p in ADMIN_PATHS) and not user.is_admin:
+            return render(request, "error.html", {"code": 403, "detail": "This area is for admins only."}, status_code=403)
     db = SessionLocal()
     try:
         request.state.unread = db.query(Notification).filter(Notification.read.is_(False)).count()
@@ -92,8 +107,8 @@ def favicon():
     return PlainTextResponse("", status_code=204)
 
 
-from .routers import auth, data, ebay_setup, inventory, ledger, reports, sales, system  # noqa: E402
+from .routers import account, auth, data, ebay_setup, inventory, ledger, reports, sales, system  # noqa: E402
 
-for r in (auth.router, inventory.router, sales.router, ledger.router, reports.router, ebay_setup.router,
+for r in (auth.router, account.router, inventory.router, sales.router, ledger.router, reports.router, ebay_setup.router,
           system.router, data.router):
     app.include_router(r)

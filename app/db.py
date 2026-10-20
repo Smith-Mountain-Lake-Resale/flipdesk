@@ -74,4 +74,7 @@ def init_db() -> None:
                     continue
                 coltype = col.type.compile(dialect=engine.dialect)
                 conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN {col.name} {coltype}'))
+                # Backfill scalar defaults so existing rows get sensible values (e.g. is_active=True).
+                if col.default is not None and getattr(col.default, "is_scalar", False):
+                    conn.execute(table.update().values({col.name: col.default.arg}))
                 print(f"[db] migrated: added {table.name}.{col.name}")
