@@ -25,6 +25,19 @@
       {% endif %}
     </div>
     <div class="card">
+      <h2>Install the app</h2>
+      <p class="sub js-install-status">Install {{ APP_NAME }} on your phone, tablet or computer so it opens in its own window from your home screen, with shortcuts for adding items and recording sales.</p>
+      <button type="button" class="btn primary js-install" hidden>Install {{ APP_NAME }}</button>
+      <details style="margin-top:10px"><summary class="small">Manual steps</summary>
+        <ul class="small">
+          <li><b>Android (Chrome, Edge, Samsung Internet):</b> menu ⋮ → <i>Install app</i> / <i>Add to Home screen</i>.</li>
+          <li><b>iPhone / iPad (Safari):</b> Share → <i>Add to Home Screen</i>.</li>
+          <li><b>Desktop Chrome / Edge:</b> the install icon at the right end of the address bar.</li>
+        </ul>
+        <p class="small muted">Browsers only offer installation when {{ APP_NAME }} is opened over HTTPS.</p>
+      </details>
+    </div>
+    <div class="card">
       <h2>Sessions</h2>
       <p class="sub">Signs you out on every other browser and device. Changing your password does this automatically.</p>
       <form method="post" action="/account/sign-out-everywhere">{{ csrf_input() }}<button class="btn">Sign out other sessions</button></form>

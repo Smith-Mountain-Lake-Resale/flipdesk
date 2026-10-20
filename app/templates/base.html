@@ -1,11 +1,21 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{% block title %}{{ APP_NAME }}{% endblock %} · {{ APP_NAME }}</title>
-<link rel="stylesheet" href="/static/app.css">
-<script src="/static/chart.umd.min.js" defer></script>
-<script src="/static/app.js" defer></script>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#16201b">
+<meta name="application-name" content="{{ APP_NAME }}">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="{{ APP_NAME }}">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/app.css?v={{ V }}">
+<script src="/static/chart.umd.min.js?v={{ V }}" defer></script>
+<script src="/static/app.js?v={{ V }}" defer></script>
 </head>
 <body>
 {% macro nav(href, label, match=None, badge=None, exact=False) -%}
@@ -16,6 +26,13 @@
 <main class="main" style="max-width:900px;margin:0 auto">{% for kind, msg in flashes %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}{{ self.content() }}</main>
 {% elif user %}
 <div class="layout">
+  <header class="mtop">
+    <button type="button" class="mnav" aria-label="Open menu" data-nav-toggle>☰</button>
+    <a href="/" class="brand" style="padding:0"><span class="dot">⇄</span>{{ APP_NAME }}</a>
+    <span class="spacer"></span>
+    {% if unread %}<a href="/notifications" class="badge" aria-label="{{ unread }} unread alerts">{{ unread }}</a>{% endif %}
+  </header>
+  <div class="scrim" data-nav-toggle></div>
   <aside class="side">
     <div class="brand"><span class="dot">⇄</span>{{ APP_NAME }}</div>
     <nav>
@@ -40,6 +57,7 @@
       {{ nav('/settings', 'Settings', exact=True) }}
       {{ nav('/data', 'Import · export · backup') }}
       {% endif %}
+      <a href="#" class="js-install" hidden><span>📲 Install app</span></a>
       {% if auth_mode != 'none' %}
       {{ nav('/account', 'My account') }}
       <a href="/logout"><span>Sign out ({{ user }})</span></a>{% endif %}
