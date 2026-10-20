@@ -1,0 +1,23 @@
+# FlipDesk with the built-in SQLite database (simplest).
+# All data lives in ./data and ./config on the host — back those up and you have everything.
+services:
+  flipdesk:
+    build: .
+    image: flipdesk:latest
+    container_name: flipdesk
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: America/New_York
+      PUID: 1000              # owner of files written to ./data and ./config
+      PGID: 1000
+      PUBLIC_URL: https://flip.example.com   # the HTTPS address eBay will redirect to
+      # DB_TYPE: sqlite       # default; the database file is /data/flipdesk.db
+      # Optional: set eBay keys here instead of in the web UI (they become read-only in the UI)
+      # EBAY_CLIENT_ID: YourName-FlipDesk-PRD-xxxxxxxx-xxxxxxxx
+      # EBAY_CLIENT_SECRET: PRD-xxxxxxxxxxxx-xxxx-xxxx-xxxx-xxxx
+      # EBAY_RUNAME: Your_Name-YourName-FlipDe-xxxxxxxx
+    volumes:
+      - ./data:/data          # database, photos, receipts, backups
+      - ./config:/config      # config.yml (optional) + secret.key (auto-generated, keep it!)
