@@ -4,7 +4,7 @@ import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
@@ -102,13 +102,8 @@ def health():
         return JSONResponse({"status": "error", "error": str(exc)}, status_code=503)
 
 
-@app.get("/favicon.ico")
-def favicon():
-    return PlainTextResponse("", status_code=204)
+from .routers import account, auth, pwa, data, ebay_setup, inventory, ledger, reports, sales, system  # noqa: E402
 
-
-from .routers import account, auth, data, ebay_setup, inventory, ledger, reports, sales, system  # noqa: E402
-
-for r in (auth.router, account.router, inventory.router, sales.router, ledger.router, reports.router, ebay_setup.router,
+for r in (pwa.router, auth.router, account.router, inventory.router, sales.router, ledger.router, reports.router, ebay_setup.router,
           system.router, data.router):
     app.include_router(r)

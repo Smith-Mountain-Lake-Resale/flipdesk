@@ -8,7 +8,6 @@ A self-hosted, web-based inventory and accounting application for eBay resellers
 
 <img width="1906" height="714" alt="image" src="https://github.com/user-attachments/assets/b0378289-c277-47d4-bdb2-32a730f1598f" />
 
-
 ## What it does
 
 | Area | Features |
@@ -24,6 +23,7 @@ A self-hosted, web-based inventory and accounting application for eBay resellers
 | **Alerts** | “Sold — it's on Shelf B3” alerts in-app and via ntfy, Discord, generic webhook (Home Assistant, n8n…) or email. |
 | **Books** | Expense ledger by Schedule C category (with receipts), mileage log at the IRS rate (2026: 72.5¢), income statement by marketplace, tax report (accrual/inventory or cash) with guided data checks and CSV export. |
 | **Data** | CSV import/export, full JSON export/restore (also migrates SQLite ⇄ PostgreSQL/MySQL), nightly backups. |
+| **Installable app** | Progressive Web App: install it from the browser on Android, iPhone/iPad or desktop for a full-screen app with its own icon, home-screen shortcuts (Add item, Record a sale) and an offline notice. Phone-friendly layout with a slide-out menu. |
 | **Security** | Local accounts with TOTP two-factor (Google Authenticator, Authy, 1Password…) and single-use recovery codes, an admin switch to require MFA for everyone, OpenID Connect single sign-on with automatic user creation and group-based access/admin rules, admin vs. regular users, brute-force throttling, sign-out-everywhere. |
 
 ## Where data lives
@@ -75,6 +75,16 @@ Scopes requested: `sell.inventory`, `sell.account`, `sell.fulfillment`, `sell.fi
 1. Leave **Dry-run** on, enable relist/reprice/promote, and watch the automation log for a few days.
 2. Set per-item minimum prices or turn automation off for specific items on their edit page.
 3. Turn dry-run off. Relists run every 20 minutes for listings inside the window; promotion runs every 6 hours.
+
+## Install it as an app (PWA)
+
+FlipDesk can be installed from the browser like a native app. **Browsers only allow this over HTTPS**, so open it through your reverse proxy / `PUBLIC_URL` rather than `http://<ip>:8080`.
+
+- **Android** (Chrome, Edge, Samsung Internet): tap **Install app** in the FlipDesk menu or on the sign-in page, or browser menu ⋮ → *Install app*.
+- **iPhone / iPad** (Safari): Share → **Add to Home Screen**. The in-app *Install app* button shows these steps.
+- **Desktop** (Chrome / Edge): the install icon at the right of the address bar, or *Install app* in the menu.
+
+Long-press the installed icon for shortcuts to **Add item** and **Record a sale**. Only static files (styles, scripts, icons) are cached on the device; pages with your financial data are always loaded live from your server, and a short “You're offline” screen appears if it can't be reached. After an upgrade, the app picks up the new version on its next launch.
 
 ## Users, two-factor and single sign-on
 
