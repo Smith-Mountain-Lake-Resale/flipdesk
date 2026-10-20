@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Recovery codes{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>{{ 'Two-factor is on 🎉' if fresh else 'New recovery codes' }}</h1><div class="sub">Save these recovery codes now — they won't be shown again.</div></div></div>
+<div class="card" style="max-width:560px">
+  <p>If you lose your phone, each code below lets you sign in once. Store them in your password manager or print them.{% if not fresh %} Your old codes no longer work.{% endif %}</p>
+  <pre id="codes" class="mono" style="font-size:16px;line-height:1.9;columns:2;background:var(--panel2);padding:14px 18px;border-radius:8px">{% for c in codes %}{{ c }}
+{% endfor %}</pre>
+  <div class="row">
+    <button type="button" class="btn" data-copy="codes">Copy</button>
+    <button type="button" class="btn" onclick="const b=new Blob([document.getElementById('codes').textContent],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='flipdesk-recovery-codes.txt';a.click()">Download .txt</button>
+    <button type="button" class="btn" onclick="window.print()">Print</button>
+    <span class="spacer"></span>
+    <a class="btn primary" href="/account">I've saved them</a>
+  </div>
+</div>
+{% endblock %}

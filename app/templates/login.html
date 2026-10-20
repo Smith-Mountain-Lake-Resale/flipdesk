@@ -6,12 +6,18 @@
   <div class="card">
     <h2>Sign in</h2>
     {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+    {% if oidc %}
+      <a class="btn primary" style="width:100%;justify-content:center" href="/auth/oidc/login?next={{ next|urlencode }}">Sign in with {{ oidc_name }}</a>
+      {% if password_login %}<div class="muted small" style="text-align:center;margin:14px 0 4px">or use your FlipDesk password</div>{% endif %}
+    {% endif %}
+    {% if password_login %}
     <form method="post" action="/login">{{ csrf_input() }}
       <input type="hidden" name="next" value="{{ next }}">
-      <div class="field"><label>Username</label><input type="text" name="username" autofocus autocomplete="username"></div>
+      <div class="field"><label>Username</label><input type="text" name="username" {{ 'autofocus' if not oidc }} autocomplete="username"></div>
       <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password"></div>
-      <button class="btn primary" style="width:100%;justify-content:center">Sign in</button>
+      <button class="btn {{ '' if oidc else 'primary' }}" style="width:100%;justify-content:center">Sign in</button>
     </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}Two-factor authentication{% endblock %}
+{% block bare %}
+<div class="login">
+  <div class="brand" style="color:var(--ink);padding:0 0 16px"><span class="dot">⇄</span>{{ APP_NAME }}</div>
+  <div class="card">
+    <h2>{{ 'Use a recovery code' if recovery else 'Enter your authenticator code' }}</h2>
+    {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+    <form method="post" action="/login/mfa">{{ csrf_input() }}
+      <input type="hidden" name="mode" value="{{ 'recovery' if recovery else 'totp' }}">
+      {% if recovery %}
+        <p class="sub">Each recovery code works once. You have {{ left }} left.</p>
+        <div class="field"><label>Recovery code</label><input type="text" name="code" autofocus autocomplete="off" placeholder="abcd-efgh" class="mono"></div>
+      {% else %}
+        <p class="sub">Open your authenticator app (Google Authenticator, Authy, 1Password, Bitwarden…) and enter the 6-digit code for {{ APP_NAME }}.</p>
+        <div class="field"><label>6-digit code</label><input type="text" name="code" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" autofocus autocomplete="one-time-code" class="mono" style="font-size:22px;letter-spacing:.2em;text-align:center"></div>
+      {% endif %}
+      <button class="btn primary" style="width:100%;justify-content:center">Verify</button>
+    </form>
+    <p class="small" style="margin-top:12px;text-align:center">
+      {% if recovery %}<a href="/login/mfa">Use my authenticator app instead</a>{% else %}<a href="/login/mfa?recovery=1">Lost your device? Use a recovery code</a>{% endif %}
+      · <a href="/logout">Cancel</a></p>
+  </div>
+</div>
+{% endblock %}
