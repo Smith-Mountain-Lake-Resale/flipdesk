@@ -1,5 +1,6 @@
-# FlipDesk <img width="128" height="128" alt="swap-logo-128x128" src="https://github.com/user-attachments/assets/8e26c77a-9351-40f1-b91b-9570ab04b78e" />
+<img width="128" height="128" alt="swap-logo-128x128" src="https://github.com/user-attachments/assets/8e26c77a-9351-40f1-b91b-9570ab04b78e" />
 
+# FlipDesk 
 
 A self-hosted, web-based inventory and accounting application for eBay resellers: automatic eBay sync, real profit tracking, inventory, end-and-relist / repricing / delayed-promotion automations, error detection, expense and mileage ledger, income statement and a Schedule C–style tax report. One Docker container, your own eBay developer keys, your own database.
 
