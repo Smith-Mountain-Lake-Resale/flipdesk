@@ -4,6 +4,9 @@ A self-hosted, web-based inventory and accounting application for eBay resellers
 
 > This application uses the eBay API but is not endorsed or certified by eBay, Inc. The tax report organizes your records; it isn't tax advice.
 
+<img width="1906" height="714" alt="image" src="https://github.com/user-attachments/assets/b0378289-c277-47d4-bdb2-32a730f1598f" />
+
+
 ## What it does
 
 | Area | Features |
