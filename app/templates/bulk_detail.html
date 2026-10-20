@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}{% from "_m.html" import status_pill, item_thumb %}
+{% block title %}{{ bb.name }}{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>{{ bb.name }}</h1><div class="sub">Bulk buy · {{ bb.purchase_date|dt }} · {{ bb.source or 'no source' }}</div></div>
+<div class="row"><a class="btn" href="/inventory/new?bulk={{ bb.id }}">+ Add item</a><a class="btn" href="/bulk-buys">← All bulk buys</a></div></div>
+<div class="grid g4">
+  <div class="card kpi"><div class="l">Paid</div><div class="v">{{ bb.total_cost|money }}</div><div class="s">{{ stats.allocated|money }} allocated to items</div></div>
+  <div class="card kpi"><div class="l">Revenue</div><div class="v">{{ stats.revenue|money }}</div><div class="s">{{ stats.sold }} of {{ bb.items|length }} items sold</div></div>
+  <div class="card kpi"><div class="l">Profit so far</div><div class="v {{ 'pos' if stats.profit >= 0 else 'neg' }}">{{ stats.profit|money }}</div><div class="s">after fees &amp; shipping</div></div>
+  <div class="card kpi"><div class="l">ROI</div><div class="v">{{ stats.roi|pct }}</div><div class="s">{{ 'paid off' if stats.profit >= 0 else 'not yet paid off' }}</div></div>
+</div>
+{% if points %}<div class="card"><h3>Return over time</h3><div class="chart sm"><canvas id="c_ret"></canvas></div></div>{% endif %}
+<div class="grid g2" style="grid-template-columns:2fr 1fr">
+  <div class="tbl">
+  <table>
+    <tr><th></th><th>Item</th><th>Status</th><th class="r">Allocated cost</th></tr>
+    {% for it in bb.items %}<tr><td style="width:50px">{{ item_thumb(it) }}</td><td><a href="/inventory/{{ it.id }}">{{ it.title }}</a></td><td>{{ status_pill(it.status) }}</td><td class="r">{{ it.cost|money }}</td></tr>
+    {% else %}<tr><td colspan="4" class="empty">No items yet.</td></tr>{% endfor %}
+  </table></div>
+  <div>
+    <div class="card"><h2>Split the cost</h2>
+      <form method="post" action="/bulk-buys/{{ bb.id }}/allocate">{{ csrf_input() }}
+        <label class="check"><input type="radio" name="method" value="even" checked> Evenly (by quantity)</label>
+        <label class="check"><input type="radio" name="method" value="value"> By listing price / value</label>
+        <button class="btn" style="margin-top:8px">Allocate {{ bb.total_cost|money }}</button>
+      </form>
+    </div>
+    <div class="card"><h2>Add items</h2>
+      <form method="post" action="/bulk-buys/{{ bb.id }}/add-items">{{ csrf_input() }}
+        <div class="field"><label>New items (one per line)</label><textarea name="titles"></textarea></div>
+        <div class="field"><label>Existing items (IDs, SKUs or eBay #, space separated)</label><input type="text" name="existing"></div>
+        <button class="btn">Add</button>
+      </form>
+    </div>
+    <div class="card"><h2>Edit</h2>
+      <form method="post" action="/bulk-buys/{{ bb.id }}/edit">{{ csrf_input() }}
+        <div class="field"><label>Name</label><input type="text" name="name" value="{{ bb.name }}"></div>
+        <div class="fields"><div class="field"><label>Date</label><input type="date" name="purchase_date" value="{{ bb.purchase_date or '' }}"></div>
+        <div class="field"><label>Total paid</label><input type="number" step="0.01" name="total_cost" value="{{ bb.total_cost }}"></div></div>
+        <div class="field"><label>Source</label><input type="text" name="source" value="{{ bb.source or '' }}"></div>
+        <div class="field"><label>Notes</label><input type="text" name="notes" value="{{ bb.notes or '' }}"></div>
+        <div class="row"><button class="btn primary">Save</button></div>
+      </form>
+      <form method="post" action="/bulk-buys/{{ bb.id }}/delete" data-confirm="Delete this bulk buy? Items are kept." style="margin-top:10px">{{ csrf_input() }}<button class="btn sm danger">Delete bulk buy</button></form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}{% if points %}
+<script>
+window.addEventListener('load', () => { FD.base(); const pal = FD.palette(); const P = {{ points|tojson }};
+  new Chart(c_ret, { type: 'line', data: { labels: P.map(p => p.x), datasets: [{ label: 'Profit vs. purchase price', data: P.map(p => p.y), borderColor: pal[0], stepped: true, pointRadius: 2 }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => FD.money(v) } } } } }); });
+</script>{% endif %}{% endblock %}

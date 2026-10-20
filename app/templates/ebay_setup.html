@@ -1,0 +1,105 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input, setting_field with context %}{% from "_m.html" import copy_field, status_pill %}
+{% block title %}eBay connection{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>eBay connection</h1><div class="sub">One-time setup of your own eBay developer keys. Everything stays on your server. Environment: <b>{{ env }}</b>.</div></div>
+</div>
+
+{% if acct %}
+<div class="card">
+  <div class="row">
+    <div><h2 style="margin:0">✅ Connected{% if acct.username %} as {{ acct.username }}{% endif %}</h2>
+    <div class="sub">{{ acct.environment }} · {{ acct.marketplace_id }} · connected {{ acct.connected_at|dt('%Y-%m-%d') }} · authorization renews automatically until {{ acct.refresh_expires|dt('%Y-%m-%d') }}</div></div>
+    <span class="spacer"></span>
+    <a class="btn" href="/ebay/connect">Reconnect</a>
+    <form class="inline" method="post" action="/settings/ebay/disconnect" data-confirm="Disconnect eBay? Synced data is kept.">{{ csrf_input() }}<button class="btn danger">Disconnect</button></form>
+  </div>
+  {% if acct.last_error %}<div class="note bad" style="margin-top:10px">Last error: {{ acct.last_error }}</div>{% endif %}
+  <div class="grid g4" style="margin-top:12px">
+    <div class="kpi"><div class="l">Active listings</div><div class="v">{{ counts.listings }}</div><div class="s">synced {{ acct.listings_synced_at|dt('%b %d %H:%M') }}</div></div>
+    <div class="kpi"><div class="l">Sales on record</div><div class="v">{{ counts.sales }}</div><div class="s">orders synced {{ acct.orders_synced_at|dt('%b %d %H:%M') }}{% if not acct.backfill_done %} · backfill pending{% endif %}</div></div>
+    <div class="kpi"><div class="l">Finance transactions</div><div class="v">{{ counts.finance }}</div><div class="s">synced {{ acct.finances_synced_at|dt('%b %d %H:%M') }}</div></div>
+    <div class="kpi"><div class="l">Sync now</div>
+      <div class="row" style="margin-top:6px">
+        {% for j, l in [('full_sync','Everything'),('sync_listings','Listings'),('sync_orders','Orders'),('sync_finances','Finances')] %}
+        <form class="inline" method="post" action="/sync/{{ j }}">{{ csrf_input() }}<button class="btn sm">{{ l }}</button></form>{% endfor %}
+      </div></div>
+  </div>
+  <details style="margin-top:10px"><summary>Recent jobs</summary>
+    <table><tr><th>Job</th><th>Started (UTC)</th><th>Status</th><th>Result</th></tr>
+    {% for j in jobs %}<tr><td>{{ j.job }}</td><td>{{ j.started|dt('%m-%d %H:%M:%S') }}</td><td>{{ status_pill(j.status) }}</td><td class="small">{{ (j.message or '')[:300] }}</td></tr>{% endfor %}</table>
+    <p class="small muted">Next runs: {% for k, v in next_runs.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% endfor %} · <a href="/jobs">full job log</a></p>
+  </details>
+</div>
+{% endif %}
+
+<div class="steps">
+  <div class="step {{ 'done' if have_keys }}">
+    <h2>Create an eBay developer account and keyset</h2>
+    <ol class="howto">
+      <li>Sign up (free) at <a href="https://developer.ebay.com/signin" target="_blank" rel="noopener">developer.ebay.com</a> — use or link the eBay account you sell with. Approval can take a day.</li>
+      <li>Open <a href="https://developer.ebay.com/my/keys" target="_blank" rel="noopener">Application Keys</a>, give the app a name (e.g. “FlipDesk”), and create a <b>Production</b> keyset (or Sandbox to experiment).</li>
+      <li>eBay won't activate a Production keyset until you complete step 3 (account-deletion notifications) — do steps 2–3 next.</li>
+    </ol>
+  </div>
+
+  <div class="step {{ 'done' if ep.configured and ep.is_https }}">
+    <h2>Give this app a public HTTPS address</h2>
+    <p>eBay redirects back to this app after you sign in, and sends account-deletion notices to it, so it needs an <b>HTTPS</b> URL that eBay can reach. Typical options: your existing reverse proxy (Nginx Proxy Manager, Traefik, Caddy, SWAG) or a Cloudflare Tunnel. Only <code>/ebay/*</code> and <code>/privacy</code> need to be reachable from the internet if you want to keep the rest on your LAN.</p>
+    <p class="small muted">No public URL? You can still connect: eBay will send your browser to the accepted URL, and you paste that address into step 6. You'd need to request an exemption from account-deletion notifications from eBay instead of step 3.</p>
+    {% if not ep.configured %}<div class="note warn">PUBLIC_URL isn't set — the URLs below are guessed from how you opened this page ({{ ep.base }}).</div>
+    {% elif not ep.is_https %}<div class="note warn">PUBLIC_URL isn't HTTPS. eBay requires HTTPS for the accepted URL and the notification endpoint.</div>{% endif %}
+  </div>
+
+  <div class="step {{ 'done' if last_deletion }}" id="deletion">
+    <h2>Subscribe to Marketplace Account Deletion notifications</h2>
+    <ol class="howto">
+      <li>On <a href="https://developer.ebay.com/my/push/" target="_blank" rel="noopener">Alerts &amp; Notifications</a> (Application Keys → <i>Notifications</i> next to your Production App ID), choose <b>Marketplace Account Deletion</b>.</li>
+      <li>Enter an alert email, then paste these two values and click <b>Save</b>. eBay immediately calls the endpoint with a challenge, which this app answers automatically.</li>
+    </ol>
+    <div class="field"><label>Marketplace account deletion notification endpoint</label>{{ copy_field('ep_del', ep.deletion) }}</div>
+    <div class="field"><label>Verification token</label>{{ copy_field('ep_tok', token) }}
+      {% if not token_locked %}<form method="post" action="/settings/ebay/regenerate-token" class="inline" data-confirm="Generate a new token? You'll need to paste it into eBay again.">{{ csrf_input() }}<button class="btn sm" style="margin-top:6px">Generate new token</button></form>{% endif %}</div>
+    <ol class="howto" start="3"><li>Click <b>Send Test Notification</b> on eBay. {% if last_deletion %}<span class="pos">Last notification received {{ last_deletion.ts|dt('%Y-%m-%d %H:%M') }} UTC{{ ' (signature verified)' if last_deletion.verified }}.</span>{% else %}<span class="muted">None received yet.</span>{% endif %} <a href="/ebay/account-deletion?challenge_code=selftest" target="_blank">Check the challenge response</a></li></ol>
+  </div>
+
+  <div class="step">
+    <h2>Create your RuName (eBay Redirect URL)</h2>
+    <ol class="howto">
+      <li>Go to <a href="https://developer.ebay.com/my/auth/?env=production&index=0" target="_blank" rel="noopener">User Tokens</a> for your Production keyset → <b>Get a Token from eBay via Your Application</b> → <b>Add eBay Redirect URL</b>.</li>
+      <li>Fill in the fields below, tick <b>OAuth Enabled</b> and Save.</li>
+      <li>Copy the generated <b>RuName</b> (looks like <code>Your_Name-FlipDesk-PRD-1a2b3c-4d5e6f</code>) into step 5.</li>
+    </ol>
+    <div class="grid g2" style="gap:0 16px">
+      <div class="field"><label>Display title</label>{{ copy_field('ep_title', APP_NAME) }}</div>
+      <div class="field"><label>Your privacy policy URL</label>{{ copy_field('ep_priv', ep.privacy) }}</div>
+      <div class="field"><label>Your auth accepted URL</label>{{ copy_field('ep_acc', ep.accepted) }}</div>
+      <div class="field"><label>Your auth declined URL</label>{{ copy_field('ep_dec', ep.declined) }}</div>
+    </div>
+  </div>
+
+  <div class="step {{ 'done' if have_keys }}">
+    <h2>Enter your keys</h2>
+    <p class="sub">From Application Keys. Values set by environment variable or <code>/config/config.yml</code> are locked here.</p>
+    <form method="post" action="/settings/ebay/keys">{{ csrf_input() }}
+      <div class="fields">{% for f in fields %}{{ setting_field(f) }}{% endfor %}</div>
+      <div class="row"><button class="btn primary">Save</button></div>
+    </form>
+    {% if have_keys %}<form method="post" action="/settings/ebay/test" style="margin-top:10px">{{ csrf_input() }}<button class="btn">Test App ID / Cert ID</button></form>{% endif %}
+  </div>
+
+  <div class="step {{ 'done' if acct }}">
+    <h2>Connect your eBay seller account</h2>
+    {% if have_keys %}
+      <p>Sign in to eBay and grant access. FlipDesk requests these scopes:</p>
+      <ul class="small mono">{% for s in scopes %}<li>{{ s.replace('https://api.ebay.com/oauth/api_scope', 'api_scope') }}</li>{% endfor %}</ul>
+      <a class="btn primary" href="/ebay/connect">{{ 'Reconnect eBay' if acct else 'Connect eBay' }} →</a>
+      <details style="margin-top:12px"><summary>eBay can't reach this app / the redirect didn't come back?</summary>
+        <p class="small">After you approve on eBay, copy the full address from your browser's address bar (it contains <code>code=</code>) and paste it here. Codes expire after about 5 minutes.</p>
+        <form method="post" action="/ebay/manual-code" class="row">{{ csrf_input() }}<input type="text" name="pasted" placeholder="https://…/ebay/callback?state=…&code=v%5E1.1%23i…" style="flex:1"><button class="btn">Finish connecting</button></form>
+      </details>
+    {% else %}<p class="muted">Save your App ID, Cert ID and RuName first.</p>{% endif %}
+    <p class="small muted" style="margin-top:10px">On first connect FlipDesk backfills up to two years of orders and fees, then keeps everything in sync on the schedule in <a href="/settings?tab=sync">Settings → Sync</a>.</p>
+  </div>
+</div>
+{% endblock %}

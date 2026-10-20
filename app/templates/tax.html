@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Tax report {{ year }}{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Tax report {{ year }}</h1><div class="sub">Schedule C layout · updates in real time · {{ 'Accrual (inventory / COGS)' if r.method == 'accrual' else 'Cash (purchases deducted when paid)' }}</div></div>
+  <form class="row" method="get">
+    <select name="year" onchange="this.form.submit()">{% for y in years %}<option {{ 'selected' if y == year }}>{{ y }}</option>{% endfor %}</select>
+    <select name="method" onchange="this.form.submit()"><option value="accrual" {{ 'selected' if method == 'accrual' }}>Accrual / inventory</option><option value="cash" {{ 'selected' if method == 'cash' }}>Cash</option></select>
+    <a class="btn" href="?year={{ year }}&method={{ method }}&format=csv">Download CSV</a>
+    <button type="button" class="btn" onclick="window.print()">Print</button>
+  </form>
+</div>
+{% set open = r.checks|selectattr('count')|list %}
+<div class="card">
+  <h2>Guided data checks</h2>
+  {% for c in r.checks %}
+    <div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)">
+      <span class="pill {{ 'ok' if not c.count else c.severity }}">{{ '✓' if not c.count else c.count }}</span>
+      <b>{{ c.label }}</b><span class="muted small">{{ c.help }}</span><span class="spacer"></span>
+      {% if c.count %}<a class="btn sm" href="{{ c.link }}">Fix</a>{% endif %}
+    </div>
+  {% endfor %}
+  {% if not open %}<p class="pos">All checks pass — your report is complete.</p>{% endif %}
+</div>
+<div class="grid g2">
+<div class="card">
+  <h2>Part I — Income</h2>
+  <table class="stmt">
+    <tr><td>1 · Gross receipts or sales</td><td class="r">{{ r.line1|money }}</td></tr>
+    <tr><td>2 · Returns and allowances</td><td class="r">{{ r.line2|money }}</td></tr>
+    <tr class="total"><td>3 · Subtract line 2 from line 1</td><td class="r">{{ r.line3|money }}</td></tr>
+    <tr><td>4 · Cost of goods sold (line 42)</td><td class="r">{{ r.line4|money }}</td></tr>
+    <tr class="total"><td>5 · Gross profit</td><td class="r">{{ r.line5|money }}</td></tr>
+  </table>
+  <h3 style="margin-top:14px">Gross receipts by marketplace</h3>
+  <table class="stmt">{% for k, v in r.gross_by_marketplace.items() %}<tr class="indent"><td>{{ k }}</td><td class="r">{{ v|money }}</td></tr>{% endfor %}</table>
+  <p class="small muted">Gross receipts = item price + shipping paid by buyers. {{ r.tax_collected|money }} of sales tax collected &amp; remitted by marketplaces is excluded (it isn't your income). Compare against your 1099-K, which may include tax and shipping.</p>
+</div>
+<div class="card">
+  <h2>Part III — Cost of goods sold</h2>
+  <table class="stmt">
+    <tr><td>35 · Inventory at beginning of year</td><td class="r">{{ r.part3.begin|money }}</td></tr>
+    <tr><td>36 · Purchases</td><td class="r">{{ r.part3.purchases|money }}</td></tr>
+    <tr class="total"><td>40 · Add lines 35–39</td><td class="r">{{ (r.part3.begin + r.part3.purchases)|money }}</td></tr>
+    <tr><td>41 · Inventory at end of year</td><td class="r">{{ r.part3.end|money }}</td></tr>
+    <tr class="total"><td>42 · Cost of goods sold</td><td class="r">{{ r.part3.cogs|money }}</td></tr>
+  </table>
+  <p class="small muted">{% if r.method == 'cash' %}Cash method: inventory bought this year is deducted this year, so beginning and ending inventory are zero.{% else %}Inventory is valued at cost. Written-off (lost, damaged, donated) items leave inventory and land in COGS.{% endif %}</p>
+</div>
+</div>
+<div class="card">
+  <h2>Part II — Expenses</h2>
+  <table class="stmt">
+    {% for e in r.expense_lines %}<tr><td style="width:70px" class="muted">{{ e.line }}</td><td>{{ e.label }}</td><td class="r">{{ e.amount|money }}</td></tr>{% else %}<tr><td colspan="3" class="muted">No expenses.</td></tr>{% endfor %}
+    <tr class="total"><td>28</td><td>Total expenses</td><td class="r">{{ r.line28|money }}</td></tr>
+    <tr class="grand"><td>31</td><td>Net profit (loss)</td><td class="r {{ 'pos' if r.line31 >= 0 else 'neg' }}">{{ r.line31|money }}</td></tr>
+  </table>
+</div>
+<p class="small muted">This report organizes your records for filing; it isn't tax advice. Confirm treatment of inventory, home office, vehicle and depreciation with a tax professional.</p>
+{% endblock %}

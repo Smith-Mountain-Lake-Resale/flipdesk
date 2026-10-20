@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% from "_m.html" import status_pill %}
+{% block title %}Job log{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Background jobs</h1><div class="sub">Next: {% for k, v in next_runs.items() %}{{ k }} {{ v }}{{ ' · ' if not loop.last }}{% endfor %}</div></div></div>
+<div class="tbl"><table>
+  <tr><th>Job</th><th>Started (UTC)</th><th>Finished</th><th>Status</th><th>Result</th></tr>
+  {% for j in rows %}<tr><td>{{ j.job }}</td><td class="nowrap">{{ j.started|dt('%m-%d %H:%M:%S') }}</td><td class="nowrap">{{ j.finished|dt('%H:%M:%S') }}</td><td>{{ status_pill(j.status) }}</td>
+    <td class="small"><details><summary>{{ (j.message or '').split('\n')[0][:160] }}</summary><pre style="white-space:pre-wrap">{{ j.message }}</pre></details></td></tr>
+  {% else %}<tr><td colspan="5" class="empty">No jobs have run yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input, setting_field with context %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Settings</h1><div class="sub">Values here are stored in the database. Anything set as an environment variable or in <code>/config/config.yml</code> takes precedence and shows as locked.</div></div></div>
+<div class="tabs">
+  {% for k, l in groups.items() %}<a href="?tab={{ k }}" class="{{ 'on' if tab == k }}">{{ l }}</a>{% endfor %}
+  <a href="/automations">Automations</a><a href="/settings/ebay">eBay</a>
+  <a href="?tab=users" class="{{ 'on' if tab == 'users' }}">Users</a><a href="?tab=about" class="{{ 'on' if tab == 'about' }}">About</a>
+</div>
+{% if tab in groups %}
+<div class="card" style="max-width:860px">
+  <form method="post" action="/settings/{{ tab }}">{{ csrf_input() }}
+    {% for f in fields %}{{ setting_field(f) }}{% endfor %}
+    <button class="btn primary">Save</button>
+  </form>
+  {% if tab == 'alerts' %}
+    <form method="post" action="/settings-test-alerts" style="margin-top:12px">{{ csrf_input() }}<button class="btn">Send a test alert</button></form>
+    <p class="small muted">Alerts always appear under <a href="/notifications">Alerts</a> in the app; the channels above are optional push destinations.</p>
+  {% endif %}
+</div>
+{% elif tab == 'users' %}
+<div class="grid g2">
+  <div class="card"><h2>Users</h2>
+    <table>{% for u in users %}<tr><td>{{ u.username }}{% if u.username == user %} <span class="pill">you</span>{% endif %}</td><td class="muted small">since {{ u.created_at|dt }}</td>
+      <td class="r">{% if u.username != user %}<form class="inline" method="post" action="/settings-users/{{ u.id }}/delete" data-confirm="Remove {{ u.username }}?">{{ csrf_input() }}<button class="btn sm danger">Remove</button></form>{% endif %}</td></tr>{% endfor %}</table>
+    <h3 style="margin-top:16px">Add user</h3>
+    <form method="post" action="/settings-users/add" class="fields">{{ csrf_input() }}
+      <div class="field"><label>Username</label><input type="text" name="username"></div>
+      <div class="field"><label>Password</label><input type="password" name="password" autocomplete="new-password"></div>
+      <div class="field"><label>&nbsp;</label><button class="btn">Add</button></div>
+    </form>
+  </div>
+  <div class="card"><h2>Change your password</h2>
+    <form method="post" action="/settings-users/password">{{ csrf_input() }}
+      <div class="field"><label>Current password</label><input type="password" name="current" autocomplete="current-password"></div>
+      <div class="field"><label>New password</label><input type="password" name="new" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm new password</label><input type="password" name="new2" autocomplete="new-password"></div>
+      <button class="btn primary">Change password</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<div class="card" style="max-width:760px"><h2>About this install</h2>
+  <table class="stmt">
+    <tr><td>Version</td><td>{{ about.version }}</td></tr>
+    <tr><td>Database</td><td class="mono">{{ about.db }}</td></tr>
+    <tr><td>Data directory (DB, uploads, backups)</td><td class="mono">{{ about.data }}</td></tr>
+    <tr><td>Config directory</td><td class="mono">{{ about.config }}{{ ' (config.yml present)' if about.config_file else '' }}</td></tr>
+    <tr><td>Auth mode</td><td>{{ about.auth }}</td></tr>
+    <tr><td>Time zone</td><td>{{ about.tz }}</td></tr>
+  </table>
+  <h3 style="margin-top:14px">Scheduled jobs</h3>
+  <table class="stmt">{% for k, v in next_runs.items() %}<tr><td>{{ k }}</td><td>next {{ v }}</td></tr>{% endfor %}</table>
+  <p class="small muted">Keep <code>/config/secret.key</code> with your backups — it encrypts stored eBay tokens and secrets.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}Bulk buys{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Bulk buys</h1><div class="sub">Track a lot, pallet or storage-unit haul as one purchase and watch its true return over time.</div></div></div>
+<div class="grid g2" style="grid-template-columns:2fr 1fr">
+<div class="tbl">
+<table>
+  <tr><th>Name</th><th>Bought</th><th>Source</th><th class="r">Cost</th><th class="r">Items</th><th class="r">Sold</th><th class="r">Revenue</th><th class="r">Profit</th><th class="r">ROI</th></tr>
+  {% for r in rows %}
+  <tr><td><a href="/bulk-buys/{{ r.bb.id }}">{{ r.bb.name }}</a></td><td>{{ r.bb.purchase_date|dt }}</td><td>{{ r.bb.source or '—' }}</td>
+    <td class="r">{{ r.bb.total_cost|money }}</td><td class="r">{{ r.items }}</td><td class="r">{{ r.sold }}</td>
+    <td class="r">{{ r.revenue|money }}</td><td class="r {{ 'pos' if r.profit >= 0 else 'neg' }}">{{ r.profit|money }}</td><td class="r">{{ r.roi|pct }}</td></tr>
+  {% else %}<tr><td colspan="9" class="empty">No bulk buys yet.</td></tr>{% endfor %}
+</table></div>
+<div class="card">
+  <h2>New bulk buy</h2>
+  <datalist id="sources">{% for s in sources %}<option value="{{ s }}">{% endfor %}</datalist>
+  <form method="post" action="/bulk-buys/new">{{ csrf_input() }}
+    <div class="field"><label>Name</label><input type="text" name="name" placeholder="Estate sale — Oak St" required></div>
+    <div class="fields">
+      <div class="field"><label>Date</label><input type="date" name="purchase_date" value="{{ today }}"></div>
+      <div class="field"><label>Total paid</label><input type="number" step="0.01" name="total_cost" required></div>
+    </div>
+    <div class="field"><label>Source</label><input type="text" name="source" list="sources"></div>
+    <div class="field"><label>Items (one per line, optional)</label><textarea name="titles" placeholder="Pyrex bowl&#10;Corningware set&#10;Box of VHS tapes"></textarea><div class="help">Cost is split evenly across these; you can re-split by listing value later.</div></div>
+    <div class="field"><label>Notes</label><input type="text" name="notes"></div>
+    <button class="btn primary">Create</button>
+  </form>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}{% from "_m.html" import status_pill %}
+{% block title %}Sale{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>{{ s.title }}</h1><div class="sub">{{ s.marketplace }} · order <span class="mono">{{ s.order_id }}</span> · {{ s.sale_date|dt('%Y-%m-%d %H:%M') }} · {{ status_pill(s.status) }}{% if s.restocked %} <span class="pill">restocked</span>{% endif %}{% if s.fulfillment_status %} · {{ s.fulfillment_status|replace('_',' ')|lower }}{% endif %}</div></div>
+  <div class="row">{% if s.item_id %}<a class="btn" href="/inventory/{{ s.item_id }}">View item</a>{% endif %}<a class="btn" href="/sales">← Sales</a></div>
+</div>
+<div class="grid g2">
+  <div class="card">
+    <h2>Profit breakdown</h2>
+    <table class="stmt">
+      <tr><td>Item price</td><td class="r">{{ s.sale_price|money }}</td></tr>
+      <tr><td>Shipping paid by buyer</td><td class="r">{{ s.shipping_charged|money }}</td></tr>
+      <tr class="total"><td>Gross</td><td class="r">{{ s.gross|money }}</td></tr>
+      <tr class="indent"><td>Marketplace fees</td><td class="r">−{{ s.marketplace_fees|money }}</td></tr>
+      <tr class="indent"><td>Ad / promoted listing fees</td><td class="r">−{{ s.ad_fees|money }}</td></tr>
+      <tr class="indent"><td>Shipping label</td><td class="r">−{{ s.shipping_cost|money }}</td></tr>
+      <tr class="indent"><td>Other fees</td><td class="r">−{{ s.other_fees|money }}</td></tr>
+      <tr class="indent"><td>Refunded</td><td class="r">−{{ s.refund_amount|money }}</td></tr>
+      <tr class="indent"><td>Cost of goods{% if s.cogs_override is not none %} (override){% endif %}</td><td class="r">{% if s.cogs is none %}<span class="pill unlisted">missing</span>{% else %}−{{ s.cogs|money }}{% endif %}</td></tr>
+      <tr class="grand"><td>Net profit</td><td class="r {{ 'pos' if s.net_profit >= 0 else 'neg' }}">{{ s.net_profit|money }}</td></tr>
+      <tr><td class="muted">ROI</td><td class="r muted">{{ s.roi|pct }}</td></tr>
+      <tr><td class="muted">Sales tax collected by marketplace (not income)</td><td class="r muted">{{ s.tax_collected|money }}</td></tr>
+    </table>
+    {% if s.buyer_city or s.buyer_country %}<p class="small muted">Ship to: {{ s.buyer_city or '' }} {{ s.buyer_state or '' }} {{ s.buyer_postal or '' }} {{ s.buyer_country or '' }}{% if s.buyer_username %} · buyer {{ s.buyer_username }}{% endif %}</p>{% endif %}
+    {% if siblings %}<p class="small">Same order: {% for o in siblings %}<a href="/sales/{{ o.id }}">{{ o.title }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+    {% if txns %}
+      <h3 style="margin-top:16px">eBay finance transactions</h3>
+      <table><tr><th>Date</th><th>Type</th><th>Detail</th><th class="r">Amount</th></tr>
+      {% for t in txns %}<tr><td>{{ t.transaction_date|dt }}</td><td>{{ t.transaction_type|replace('_',' ')|lower }}</td><td class="small">{{ (t.fee_type or '')|replace('_',' ')|lower }} {{ t.memo or '' }}</td><td class="r">{{ '+' if t.booking_entry == 'CREDIT' else '−' }}{{ t.amount|money }}{% if t.fee_amount %}<div class="muted small">fees {{ t.fee_amount|money }}</div>{% endif %}</td></tr>{% endfor %}
+      </table>
+    {% endif %}
+  </div>
+  <div>
+    <form method="post" action="/sales/{{ s.id }}/edit">{{ csrf_input() }}
+    {% if s.source == 'ebay_sync' %}
+      <div class="card">
+        <h2>Adjust</h2>
+        <p class="sub">Amounts on eBay sales come from eBay and refresh on every sync. You can link the item, override cost, and add other fees.</p>
+        <div class="field"><label>Inventory item</label><input type="text" name="item_id" list="itemlist" value="{{ ('#' ~ s.item.id ~ ' ' ~ s.item.title) if s.item else '' }}"><datalist id="itemlist">{% for it in items %}<option value="#{{ it.id }} {{ it.title }}">{% endfor %}</datalist></div>
+        <div class="fields">
+          <div class="field"><label>Other fees</label><input type="number" step="0.01" name="other_fees" value="{{ s.other_fees or 0 }}"></div>
+          <div class="field"><label>Cost override</label><input type="number" step="0.01" name="cogs_override" value="{{ s.cogs_override if s.cogs_override is not none else '' }}"></div>
+        </div>
+        <label class="check"><input type="checkbox" name="restocked" {{ 'checked' if s.restocked }}> Item came back to inventory</label>
+        <div class="field" style="margin-top:10px"><label>Notes</label><input type="text" name="notes" value="{{ s.notes or '' }}"></div>
+        <button class="btn primary">Save</button>
+      </div>
+    {% else %}
+      {% include "_sale_fields.html" %}
+      <div class="card"><div class="field"><label>Inventory item</label><input type="text" name="item_id" list="itemlist" value="{{ ('#' ~ s.item.id ~ ' ' ~ s.item.title) if s.item else '' }}"><datalist id="itemlist">{% for it in items %}<option value="#{{ it.id }} {{ it.title }}">{% endfor %}</datalist></div>
+      <button class="btn primary">Save</button></div>
+    {% endif %}
+    </form>
+    {% if s.source != 'ebay_sync' %}<form method="post" action="/sales/{{ s.id }}/delete" data-confirm="Delete this sale?">{{ csrf_input() }}<button class="btn sm danger">Delete sale</button></form>{% endif %}
+  </div>
+</div>
+{% endblock %}

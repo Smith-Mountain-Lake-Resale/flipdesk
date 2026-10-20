@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}First-run setup{% endblock %}
+{% block bare %}
+<div class="login" style="max-width:440px">
+  <div class="brand" style="color:var(--ink);padding:0 0 16px"><span class="dot">⇄</span>{{ APP_NAME }}</div>
+  <div class="card">
+    <h2>Create your admin account</h2>
+    <p class="sub">This is a fresh install. The account you create here protects the web UI. Next you'll connect your eBay developer keys.</p>
+    {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+    <form method="post" action="/setup">{{ csrf_input() }}
+      <div class="field"><label>Username</label><input type="text" name="username" value="{{ username or '' }}" autofocus></div>
+      <div class="field"><label>Password (8+ characters)</label><input type="password" name="password" autocomplete="new-password"></div>
+      <div class="field"><label>Confirm password</label><input type="password" name="password2" autocomplete="new-password"></div>
+      <button class="btn primary" style="width:100%;justify-content:center">Create account</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

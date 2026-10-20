@@ -1,0 +1,28 @@
+<div class="card">
+  <div class="fields">
+    <div class="field"><label>Marketplace</label><select name="marketplace">{% for m in marketplaces %}<option {{ 'selected' if s.marketplace == m }}>{{ m }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Order # (optional)</label><input type="text" name="order_id" value="{{ s.order_id or '' }}"></div>
+    <div class="field"><label>Sale date</label><input type="date" name="sale_date" value="{{ s.sale_date.date() if s.sale_date else '' }}"></div>
+    <div class="field"><label>Status</label><select name="status">{% for k in ['completed','partially_refunded','refunded','cancelled'] %}<option value="{{ k }}" {{ 'selected' if s.status == k }}>{{ k|replace('_',' ') }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="field"><label>Title</label><input type="text" name="title" value="{{ s.title or '' }}"></div>
+  <div class="fields">
+    <div class="field"><label>Quantity</label><input type="number" min="1" name="quantity" value="{{ s.quantity or 1 }}"></div>
+    <div class="field"><label>Item price (subtotal)</label><input type="number" step="0.01" name="sale_price" value="{{ s.sale_price or 0 }}"></div>
+    <div class="field"><label>Shipping paid by buyer</label><input type="number" step="0.01" name="shipping_charged" value="{{ s.shipping_charged or 0 }}"></div>
+    <div class="field"><label>Sales tax (collected by marketplace)</label><input type="number" step="0.01" name="tax_collected" value="{{ s.tax_collected or 0 }}"><div class="help">Not income — informational.</div></div>
+    <div class="field"><label>Marketplace fees</label><input type="number" step="0.01" name="marketplace_fees" value="{{ s.marketplace_fees or 0 }}"></div>
+    <div class="field"><label>Ad / promotion fees</label><input type="number" step="0.01" name="ad_fees" value="{{ s.ad_fees or 0 }}"></div>
+    <div class="field"><label>Shipping label you paid</label><input type="number" step="0.01" name="shipping_cost" value="{{ s.shipping_cost or 0 }}"></div>
+    <div class="field"><label>Other fees</label><input type="number" step="0.01" name="other_fees" value="{{ s.other_fees or 0 }}"></div>
+    <div class="field"><label>Refunded to buyer</label><input type="number" step="0.01" name="refund_amount" value="{{ s.refund_amount or 0 }}"></div>
+    <div class="field"><label>Cost override</label><input type="number" step="0.01" name="cogs_override" value="{{ s.cogs_override if s.cogs_override is not none else '' }}"><div class="help">Leave blank to use the item's cost.</div></div>
+  </div>
+  <div class="fields">
+    <div class="field"><label>Buyer city</label><input type="text" name="buyer_city" value="{{ s.buyer_city or '' }}"></div>
+    <div class="field"><label>Buyer state</label><input type="text" name="buyer_state" value="{{ s.buyer_state or '' }}"></div>
+    <div class="field"><label>Buyer country (2-letter)</label><input type="text" name="buyer_country" value="{{ s.buyer_country or '' }}" maxlength="2"></div>
+  </div>
+  <label class="check"><input type="checkbox" name="restocked" {{ 'checked' if s.restocked }}> Item came back to inventory (returned / cancelled)</label>
+  <div class="field" style="margin-top:10px"><label>Notes</label><input type="text" name="notes" value="{{ s.notes or '' }}"></div>
+</div>

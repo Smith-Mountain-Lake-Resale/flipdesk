@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}{{ APP_NAME }}{% endblock %} · {{ APP_NAME }}</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/chart.umd.min.js" defer></script>
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+{% macro nav(href, label, match=None, badge=None, exact=False) -%}
+{%- set m = match or href -%}
+<a href="{{ href }}" class="{{ 'on' if (path == m or (not exact and m != '/' and path.startswith(m))) else '' }}"><span>{{ label }}</span>{% if badge %}<span class="badge">{{ badge }}</span>{% endif %}</a>
+{%- endmacro %}
+{% if user %}
+<div class="layout">
+  <aside class="side">
+    <div class="brand"><span class="dot">⇄</span>{{ APP_NAME }}</div>
+    <nav>
+      {{ nav('/', 'Dashboard') }}
+      <div class="sec">Inventory</div>
+      {{ nav('/inventory', 'Inventory') }}
+      {{ nav('/listings', 'eBay listings') }}
+      {{ nav('/bulk-buys', 'Bulk buys') }}
+      <div class="sec">Money</div>
+      {{ nav('/sales', 'Sales') }}
+      {{ nav('/ledger', 'Expense ledger') }}
+      {{ nav('/mileage', 'Mileage') }}
+      {{ nav('/reports/income', 'Income statement') }}
+      {{ nav('/reports/tax', 'Tax report') }}
+      <div class="sec">Automation</div>
+      {{ nav('/automations', 'Relist · reprice · promote') }}
+      {{ nav('/issues', 'Error detection') }}
+      {{ nav('/notifications', 'Alerts', badge=unread if unread else None) }}
+      <div class="sec">System</div>
+      {{ nav('/settings/ebay', 'eBay connection') }}
+      {{ nav('/settings', 'Settings', exact=True) }}
+      {{ nav('/data', 'Import · export · backup') }}
+      {% if auth_mode != 'none' %}<a href="/logout"><span>Sign out ({{ user }})</span></a>{% endif %}
+    </nav>
+  </aside>
+  <main class="main">
+    {% for kind, msg in flashes %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+    <p class="muted small" style="margin-top:40px">{{ APP_NAME }} v{{ APP_VERSION }} · self-hosted · This application uses the eBay API but is not endorsed or certified by eBay, Inc.</p>
+  </main>
+</div>
+{% else %}
+<main>{% for kind, msg in flashes %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}{% block bare %}{% endblock %}</main>
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

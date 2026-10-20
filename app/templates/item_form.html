@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}{{ 'Add item' if new else 'Edit item' }}{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>{{ 'Add item' if new else 'Edit item' }}</h1>
+<div class="sub">{% if new %}Log items the moment you buy them — connect them to an eBay listing later (or set the same SKU on eBay and they link automatically).{% else %}#{{ it.id }}{% endif %}</div></div>
+{% if not new %}<a class="btn" href="/inventory/{{ it.id }}">← Back</a>{% endif %}</div>
+<datalist id="sources">{% for s in sources %}<option value="{{ s }}">{% endfor %}</datalist>
+<datalist id="locations">{% for s in locations %}<option value="{{ s }}">{% endfor %}</datalist>
+<form method="post" enctype="multipart/form-data" action="{{ '/inventory/new' if new else '/inventory/%d/edit'|format(it.id) }}">{{ csrf_input() }}
+<div class="card">
+  <div class="field"><label>Title</label><input type="text" name="title" value="{{ it.title or '' }}" required autofocus></div>
+  <div class="fields">
+    <div class="field"><label>SKU / custom label</label><input type="text" name="sku" value="{{ it.sku or '' }}"></div>
+    <div class="field"><label>Quantity</label><input type="number" name="quantity" min="1" value="{{ it.quantity or 1 }}"></div>
+    <div class="field"><label>Total cost</label><input type="number" step="0.01" name="cost" value="{{ it.cost if it.cost is not none else '' }}"><div class="help">For all units combined.</div></div>
+    <div class="field"><label>Purchase date</label><input type="date" name="purchase_date" value="{{ it.purchase_date or '' }}"></div>
+    <div class="field"><label>Source (where bought)</label><input type="text" name="source" list="sources" value="{{ it.source or '' }}"></div>
+    <div class="field"><label>Storage location</label><input type="text" name="storage_location" list="locations" value="{{ it.storage_location or '' }}"><div class="help">Shown in sale alerts so you can find it fast.</div></div>
+    <div class="field"><label>Category</label><input type="text" name="category" value="{{ it.category or '' }}"></div>
+    <div class="field"><label>Brand</label><input type="text" name="brand" value="{{ it.brand or '' }}"></div>
+    <div class="field"><label>Condition</label><input type="text" name="condition" value="{{ it.condition or '' }}"></div>
+    <div class="field"><label>Bulk buy</label><select name="bulk_buy_id"><option value="">— none —</option>{% for b in bulk_buys %}<option value="{{ b.id }}" {{ 'selected' if it.bulk_buy_id == b.id }}>{{ b.name }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Photo</label><input type="file" name="photo" accept="image/*"></div>
+  </div>
+  <div class="field"><label>Notes</label><textarea name="notes">{{ it.notes or '' }}</textarea></div>
+</div>
+<div class="card">
+  <h2>Automation for this item</h2>
+  <div class="fields">
+    <label class="check"><input type="checkbox" name="relist_enabled" {{ 'checked' if it.relist_enabled }}> Allow end &amp; relist</label>
+    <label class="check"><input type="checkbox" name="reprice_enabled" {{ 'checked' if it.reprice_enabled }}> Allow repricing</label>
+    <label class="check"><input type="checkbox" name="promote_enabled" {{ 'checked' if it.promote_enabled }}> Allow delayed promotion</label>
+    <div class="field"><label>Minimum price (floor)</label><input type="number" step="0.01" name="min_price" value="{{ it.min_price if it.min_price is not none else '' }}"></div>
+  </div>
+</div>
+<div class="row"><button class="btn primary">Save</button>{% if new %}<button class="btn" name="again" value="1">Save &amp; add another</button>{% endif %}</div>
+</form>
+{% endblock %}

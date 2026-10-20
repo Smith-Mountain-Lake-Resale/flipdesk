@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}{% from "_m.html" import pager, status_pill %}
+{% block title %}eBay listings{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>eBay listings</h1><div class="sub">{{ total }} {{ show }} listings. “Renews” is eBay's next 30-day Good-'Til-Cancelled renewal — the relist automation acts just before it.</div></div>
+  <form method="post" action="/sync/sync_listings">{{ csrf_input() }}<button class="btn">↻ Sync listings now</button></form>
+</div>
+<div class="tabs">{% for k,l in [('active','Active'),('relisted','Relisted'),('ended','Ended'),('sold','Sold'),('all','All')] %}<a href="?show={{ k }}" class="{{ 'on' if show == k }}">{{ l }}</a>{% endfor %}</div>
+<form class="filters" method="get"><input type="hidden" name="show" value="{{ show }}">
+  <input type="search" name="q" value="{{ p.get('q','') }}" placeholder="Search title, item #, SKU" style="min-width:260px">
+  <label class="check"><input type="checkbox" name="unlinked" value="1" {{ 'checked' if p.get('unlinked') }}> Missing cost</label>
+  <select name="sort">{% for k,l in [('renew','Renews soonest'),('oldest','Oldest'),('newest','Newest'),('price','Price'),('watchers','Watchers')] %}<option value="{{ k }}" {{ 'selected' if p.get('sort') == k }}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn">Filter</button></form>
+<div class="tbl">
+<table>
+  <tr><th></th><th>Title</th><th>Item #</th><th>Status</th><th class="r">Price</th><th class="r">Cost</th><th class="r">Qty</th><th class="r">Watch</th><th>Age</th><th>Renews</th></tr>
+  {% for l in rows %}
+  <tr>
+    <td style="width:50px">{% if l.image_url %}<img class="thumb" src="{{ l.image_url }}" loading="lazy" referrerpolicy="no-referrer" alt="">{% else %}<span class="thumb"></span>{% endif %}</td>
+    <td class="trunc">{% if l.item_id %}<a href="/inventory/{{ l.item_id }}">{{ l.title }}</a>{% else %}{{ l.title }}{% endif %}{% if l.sku %}<div class="muted small mono">{{ l.sku }}</div>{% endif %}</td>
+    <td class="mono small"><a href="{{ l.url or 'https://www.ebay.com/itm/' ~ l.ebay_item_id }}" target="_blank" rel="noopener">{{ l.ebay_item_id }}</a></td>
+    <td>{% if l.pending_relist %}<span class="pill error">relist pending</span>{% else %}{{ status_pill(l.status) }}{% endif %}{% if l.promoted %} <span class="pill info">promoted</span>{% endif %}</td>
+    <td class="r">{{ l.price|money }}</td>
+    <td class="r">{% if l.item and l.item.cost is not none %}{{ l.item.cost|money }}{% elif l.item %}<a class="pill unlisted" href="/inventory/{{ l.item_id }}/edit">add</a>{% else %}—{% endif %}</td>
+    <td class="r">{{ (l.quantity or 1) - (l.quantity_sold or 0) }}</td>
+    <td class="r">{{ l.watch_count or 0 }}</td>
+    <td class="nowrap">{% if l.item and l.item.listed_at %}{{ (now - l.item.listed_at).days }}d{% elif l.start_time %}{{ (now - l.start_time).days }}d{% else %}—{% endif %}</td>
+    <td class="nowrap {{ 'pos' if l.end_time and l.end_time < soon }}">{{ l.end_time|dt('%b %d %H:%M') if l.duration == 'GTC' else (l.duration or '—') }}</td>
+  </tr>
+  {% else %}<tr><td colspan="10" class="empty">No listings. Connect eBay and run a sync.</td></tr>{% endfor %}
+</table></div>
+{{ pager(page, pages, p) }}
+{% endblock %}

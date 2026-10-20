@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}Import · export · backup{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Import, export &amp; backup</h1><div class="sub">Database: <span class="mono">{{ db }}</span></div></div></div>
+<div class="grid g2">
+  <div class="card">
+    <h2>Import from a spreadsheet or another tool</h2>
+    <p class="sub">CSV with a header row. Column names are matched flexibly (e.g. <i>cost</i>, <i>purchase price</i>, <i>COGS</i>). Download a template to see the expected columns.</p>
+    {% for k, l in [('inventory','Inventory items'),('sales','Past sales (any marketplace)'),('expenses','Expenses'),('mileage','Mileage')] %}
+    <form method="post" action="/data/import/{{ k }}" enctype="multipart/form-data" class="row" style="padding:8px 0;border-bottom:1px solid var(--line)">{{ csrf_input() }}
+      <b style="width:200px">{{ l }}</b><input type="file" name="file" accept=".csv,text/csv" style="flex:1"><button class="btn sm">Import</button><a class="small" href="/data/sample/{{ k }}.csv">template</a>
+    </form>{% endfor %}
+  </div>
+  <div class="card">
+    <h2>Export</h2>
+    <div class="row">
+      {% for k in ['inventory','sales','expenses','mileage'] %}<a class="btn" href="/data/export/{{ k }}.csv">{{ k|title }} CSV</a>{% endfor %}
+    </div>
+    <h3 style="margin-top:16px">Full export</h3>
+    <p class="sub">Every table as JSON. Use it to move between SQLite and PostgreSQL/MySQL: export here, point the container at the new database, then restore below.</p>
+    <a class="btn primary" href="/data/export-all.json.gz">Download full export</a>
+  </div>
+</div>
+<div class="grid g2">
+  <div class="card">
+    <h2>Backups</h2>
+    <p class="sub">Written to <code>/data/backups</code> on the host. {% if is_sqlite %}SQLite backups are consistent copies of the live database file.{% else %}External-database backups are JSON exports; also back up the database server itself.{% endif %}</p>
+    <form method="post" action="/data/backup-now">{{ csrf_input() }}<button class="btn">Back up now</button></form>
+    <table style="margin-top:10px">{% for b in backups[:20] %}<tr><td class="mono small"><a href="/data/backups/{{ b.name }}">{{ b.name }}</a></td><td class="r small muted">{{ (b.stat().st_size / 1024)|round(1) }} KB</td></tr>{% else %}<tr><td class="muted">No backups yet.</td></tr>{% endfor %}</table>
+  </div>
+  <div class="card">
+    <h2>Restore / migrate</h2>
+    <div class="note bad">Replaces <b>all</b> data in the current database with the uploaded export. A backup is taken first. You'll be signed out (users come from the export).</div>
+    <form method="post" action="/data/restore" enctype="multipart/form-data">{{ csrf_input() }}
+      <div class="field"><label>FlipDesk export (.json or .json.gz)</label><input type="file" name="file"></div>
+      <div class="field"><label>Type REPLACE to confirm</label><input type="text" name="confirm" autocomplete="off"></div>
+      <button class="btn danger">Restore</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}{% from "_m.html" import period_picker %}
+{% block title %}Income statement{% endblock %}
+{% block content %}
+{% set t = r.total %}
+<div class="topbar">
+  <div><h1>Income statement</h1><div class="sub">Profit &amp; loss across every marketplace · {{ start }} to {{ end }}</div></div>
+  {{ period_picker('/reports/income', period, p) }}
+</div>
+{% if r.missing_cost %}<div class="note warn">{{ r.missing_cost }} sales in this period have no cost, so cost of goods sold is understated. <a href="/sales?missing=cost&period={{ period }}">Review</a></div>{% endif %}
+<div class="grid g2" style="grid-template-columns:1.2fr 1fr">
+<div class="card">
+  <table class="stmt">
+    <tr><td colspan="2"><h3 style="margin:0">Revenue</h3></td></tr>
+    <tr class="indent"><td>Sales</td><td class="r">{{ (t.get('sales',0))|money }}</td></tr>
+    <tr class="indent"><td>Shipping income</td><td class="r">{{ (t.get('shipping_income',0))|money }}</td></tr>
+    <tr class="indent"><td>Refunds &amp; returns</td><td class="r">−{{ (t.get('refunds',0))|money }}</td></tr>
+    <tr class="total"><td>Net revenue</td><td class="r">{{ r.revenue|money }}</td></tr>
+    <tr class="indent"><td>Cost of goods sold</td><td class="r">−{{ (t.get('cogs',0))|money }}</td></tr>
+    <tr class="total"><td>Gross profit</td><td class="r">{{ r.gross_profit|money }}</td></tr>
+    <tr><td colspan="2"><h3 style="margin:10px 0 0">Selling costs</h3></td></tr>
+    <tr class="indent"><td>Marketplace fees</td><td class="r">{{ (t.get('fees',0))|money }}</td></tr>
+    <tr class="indent"><td>Advertising (promoted listings)</td><td class="r">{{ (t.get('ads',0))|money }}</td></tr>
+    <tr class="indent"><td>Shipping labels</td><td class="r">{{ (t.get('shipping',0))|money }}</td></tr>
+    <tr class="indent"><td>Other fees</td><td class="r">{{ (t.get('other',0))|money }}</td></tr>
+    <tr class="total"><td>Total selling costs</td><td class="r">{{ r.selling|money }}</td></tr>
+    <tr><td colspan="2"><h3 style="margin:10px 0 0">Operating expenses</h3></td></tr>
+    {% for c, v in r.expenses.items() %}<tr class="indent"><td>{{ c }}</td><td class="r">{{ v|money }}</td></tr>{% endfor %}
+    <tr class="indent"><td>Mileage ({{ '{:,.1f}'.format(r.miles) }} mi)</td><td class="r">{{ r.mileage|money }}</td></tr>
+    <tr class="total"><td>Total operating expenses</td><td class="r">{{ r.opex|money }}</td></tr>
+    <tr class="grand"><td>Net income</td><td class="r {{ 'pos' if r.net >= 0 else 'neg' }}">{{ r.net|money }}</td></tr>
+  </table>
+  {% if r.inventory_purchases_unitemized %}<p class="small muted">{{ r.inventory_purchases_unitemized|money }} of un-itemized inventory purchases in the ledger are excluded here (they count toward cost of goods in the tax report).</p>{% endif %}
+</div>
+<div class="card">
+  <h2>By marketplace</h2>
+  <div class="tbl"><table>
+    <tr><th>Marketplace</th><th class="r">Revenue</th><th class="r">Costs</th><th class="r">Profit</th></tr>
+    {% for m, v in r.by_marketplace.items() %}
+    {% set rev = v.get('sales',0) + v.get('shipping_income',0) - v.get('refunds',0) %}
+    {% set cost = v.get('cogs',0) + v.get('fees',0) + v.get('ads',0) + v.get('shipping',0) + v.get('other',0) %}
+    <tr><td>{{ m }}</td><td class="r">{{ rev|money }}</td><td class="r">{{ cost|money }}</td><td class="r {{ 'pos' if rev - cost >= 0 else 'neg' }}">{{ (rev - cost)|money }}</td></tr>
+    {% else %}<tr><td colspan="4" class="empty">No sales.</td></tr>{% endfor %}
+  </table></div>
+  <p class="small muted">Marketplace profit is before operating expenses and mileage.</p>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}{% from "_m.html" import pager, status_pill, item_thumb %}
+{% block title %}Inventory{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Inventory</h1><div class="sub">Everything you own — listed, unlisted (the “death pile”) and sold. {{ total }} shown.</div></div>
+  <div class="row">
+    <a class="btn" href="/inventory/quick-edit?{{ p|urlencode }}">Quick edit costs</a>
+    <a class="btn primary" href="/inventory/new">+ Add item</a>
+  </div>
+</div>
+<div class="tabs">
+  {% set tabs = [('active','In stock', (counts.get('listed',0) + counts.get('unlisted',0))),('listed','Listed',counts.get('listed',0)),('unlisted','Unlisted',counts.get('unlisted',0)),('sold','Sold',counts.get('sold',0)),('written_off','Written off',counts.get('written_off',0)),('all','All',None)] %}
+  {% for k, l, n in tabs %}<a href="?status={{ k }}" class="{{ 'on' if status == k }}">{{ l }}{% if n is not none %} <span class="muted">{{ n }}</span>{% endif %}</a>{% endfor %}
+</div>
+<form class="filters" method="get">
+  <input type="hidden" name="status" value="{{ status }}">
+  <input type="search" name="q" value="{{ p.get('q','') }}" placeholder="Search title, SKU, item #, location…" style="min-width:260px">
+  <select name="source"><option value="">Any source</option>{% for s in sources %}<option {{ 'selected' if p.get('source') == s }}>{{ s }}</option>{% endfor %}</select>
+  <select name="location"><option value="">Any location</option>{% for s in locations %}<option {{ 'selected' if p.get('location') == s }}>{{ s }}</option>{% endfor %}</select>
+  <select name="missing"><option value="">Missing data…</option>{% for k,l in [('cost','Missing cost'),('date','Missing purchase date'),('source','Missing source'),('location','Missing location')] %}<option value="{{ k }}" {{ 'selected' if p.get('missing') == k }}>{{ l }}</option>{% endfor %}</select>
+  <select name="sort">{% for k,l in [('newest','Newest'),('oldest','Oldest'),('title','Title'),('cost','Cost'),('listed','Longest listed'),('sold','Recently sold')] %}<option value="{{ k }}" {{ 'selected' if p.get('sort') == k }}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn">Filter</button>
+</form>
+<div class="tbl">
+<table>
+  <tr><th></th><th>Item</th><th>Status</th><th>Location</th><th>Source</th><th>Bought</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">Price</th><th>eBay #</th></tr>
+  {% for it in items %}
+  {% set act = it.listings|selectattr('status','equalto','active')|list %}
+  <tr>
+    <td style="width:50px">{{ item_thumb(it) }}</td>
+    <td class="trunc"><a href="/inventory/{{ it.id }}">{{ it.title }}</a>{% if it.sku %}<div class="muted small mono">{{ it.sku }}</div>{% endif %}</td>
+    <td>{{ status_pill(it.status) }}</td>
+    <td>{{ it.storage_location or '—' }}</td>
+    <td>{{ it.source or '—' }}</td>
+    <td class="nowrap">{{ it.purchase_date|dt }}</td>
+    <td class="r">{{ it.quantity - it.quantity_sold if it.status != 'sold' else it.quantity }}</td>
+    <td class="r">{% if it.cost is none %}<a class="pill unlisted" href="/inventory/{{ it.id }}/edit">add</a>{% else %}{{ it.cost|money }}{% endif %}</td>
+    <td class="r">{{ (act[0].price if act else None)|money }}</td>
+    <td class="mono small">{% if it.current_ebay_item_id %}<a href="https://www.ebay.com/itm/{{ it.current_ebay_item_id }}" target="_blank" rel="noopener">{{ it.current_ebay_item_id }}</a>{% else %}—{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="10" class="empty">Nothing here yet. Add an item, import a CSV, or connect eBay to pull in your listings.</td></tr>{% endfor %}
+</table></div>
+{{ pager(page, pages, p) }}
+{% endblock %}

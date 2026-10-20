@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% from "_m.html" import period_picker, pager, status_pill %}
+{% block title %}Sales{% endblock %}
+{% block content %}
+{% set s = summary %}
+<div class="topbar">
+  <div><h1>Sales</h1><div class="sub">{{ label if not p.get('q') else 'Search: ' ~ p.get('q') }} · eBay sales sync automatically; record Amazon, Poshmark, Mercari, Etsy or in-person sales here too.</div></div>
+  <div class="row">{{ period_picker('/sales', period, p, {'marketplace': p.get('marketplace',''), 'status': p.get('status','')}) }}<a class="btn primary" href="/sales/new">+ Record sale</a></div>
+</div>
+<div class="grid g4">
+  <div class="card kpi"><div class="l">Gross</div><div class="v">{{ s.gross|money }}</div><div class="s">{{ s.units }} units</div></div>
+  <div class="card kpi"><div class="l">Fees + ads + labels</div><div class="v">{{ (s.fees + s.ads + s.shipping + s.other)|money }}</div><div class="s">refunds {{ s.refunds|money }}</div></div>
+  <div class="card kpi"><div class="l">Cost of goods</div><div class="v">{{ s.cogs|money }}</div><div class="s">{{ s.missing_cost }} missing a cost</div></div>
+  <div class="card kpi"><div class="l">Net profit</div><div class="v {{ 'pos' if s.net >= 0 else 'neg' }}">{{ s.net|money }}</div><div class="s">margin {{ s.margin|pct }} · ROI {{ s.roi|pct }}</div></div>
+</div>
+<form class="filters" method="get">
+  <input type="hidden" name="period" value="{{ period }}">{% if p.get('start') %}<input type="hidden" name="start" value="{{ p.start }}"><input type="hidden" name="end" value="{{ p.end }}">{% endif %}
+  <input type="search" name="q" value="{{ p.get('q','') }}" placeholder="Search title, order #, SKU (all dates)" style="min-width:260px">
+  <select name="marketplace"><option value="">All marketplaces</option>{% for m in marketplaces %}<option {{ 'selected' if p.get('marketplace') == m }}>{{ m }}</option>{% endfor %}</select>
+  <select name="status"><option value="">Any status</option>{% for k in ['completed','partially_refunded','refunded','cancelled'] %}<option value="{{ k }}" {{ 'selected' if p.get('status') == k }}>{{ k|replace('_',' ') }}</option>{% endfor %}</select>
+  <select name="missing"><option value="">—</option><option value="cost" {{ 'selected' if p.get('missing') == 'cost' }}>Missing cost</option></select>
+  <button class="btn">Filter</button>
+</form>
+<div class="tbl">
+<table>
+  <tr><th>Date</th><th>Item</th><th>Where</th><th>Status</th><th class="r">Sale</th><th class="r">Ship in</th><th class="r">Fees</th><th class="r">Label</th><th class="r">Cost</th><th class="r">Net</th><th class="r">ROI</th></tr>
+  {% for x in rows %}
+  <tr>
+    <td class="nowrap">{{ x.sale_date|dt }}</td>
+    <td class="trunc"><a href="/sales/{{ x.id }}">{{ x.title }}</a><div class="muted small">{{ x.buyer_city or '' }}{{ ', ' if x.buyer_city and x.buyer_state }}{{ x.buyer_state or '' }} {{ x.buyer_country or '' }}</div></td>
+    <td>{{ x.marketplace }}</td><td>{{ status_pill(x.status) }}</td>
+    <td class="r">{{ x.sale_price|money }}</td><td class="r">{{ x.shipping_charged|money }}</td>
+    <td class="r">{{ (x.marketplace_fees + x.ad_fees + x.other_fees)|money }}</td><td class="r">{{ x.shipping_cost|money }}</td>
+    <td class="r">{% if x.cogs is none %}{% if x.item_id %}<a class="pill unlisted" href="/inventory/{{ x.item_id }}/edit">add</a>{% else %}<a class="pill unlisted" href="/sales/{{ x.id }}">link</a>{% endif %}{% else %}{{ x.cogs|money }}{% endif %}</td>
+    <td class="r {{ 'pos' if x.net_profit >= 0 else 'neg' }}">{{ x.net_profit|money }}</td><td class="r">{{ x.roi|pct }}</td>
+  </tr>
+  {% else %}<tr><td colspan="11" class="empty">No sales match.</td></tr>{% endfor %}
+</table></div>
+{{ pager(page, pages, p) }}
+{% endblock %}

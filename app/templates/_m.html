@@ -1,0 +1,59 @@
+{% macro csrf_input() -%}<input type="hidden" name="_csrf" value="{{ csrf }}">{%- endmacro %}
+
+{% macro period_picker(action, period, p, extra=None) -%}
+<form method="get" action="{{ action }}" class="row">
+  {% for k, v in (extra or {}).items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <select name="period" onchange="this.form.querySelector('.custom').style.display=this.value=='custom'?'flex':'none'; if(this.value!='custom') this.form.submit()" style="width:auto">
+    {% for k, l in [('7d','Last 7 days'),('30d','Last 30 days'),('90d','Last 90 days'),('ytd','Year to date'),('12m','Last 12 months'),('lastyear','Last year'),('all','All time'),('custom','Custom…')] %}
+    <option value="{{ k }}" {{ 'selected' if period == k }}>{{ l }}</option>{% endfor %}
+  </select>
+  <span class="custom row" style="display:{{ 'flex' if period=='custom' else 'none' }};gap:6px">
+    <input type="date" name="start" value="{{ p.get('start','') }}" style="width:auto"><input type="date" name="end" value="{{ p.get('end','') }}" style="width:auto">
+    <button class="btn sm">Apply</button>
+  </span>
+</form>
+{%- endmacro %}
+
+{% macro pager(page, pages, p) -%}
+{% if pages > 1 %}
+<div class="pager">
+  {% set q = p.copy() %}
+  {% if page > 1 %}{% set _ = q.update({'page': page-1}) %}<a class="btn sm" href="?{{ q|urlencode }}">← Prev</a>{% endif %}
+  <span class="muted small">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}{% set _ = q.update({'page': page+1}) %}<a class="btn sm" href="?{{ q|urlencode }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro setting_field(f) -%}
+<div class="field">
+  {% if f.type == 'bool' %}
+    <label class="check"><input type="checkbox" name="{{ f.key }}" {{ 'checked' if f.value == 'true' }} {{ 'disabled' if f.locked }}> {{ f.label }}</label>
+  {% else %}
+    <label for="f_{{ f.key }}">{{ f.label }}</label>
+    {% if f.choices %}
+      <select id="f_{{ f.key }}" name="{{ f.key }}" {{ 'disabled' if f.locked }}>{% for c in f.choices %}<option {{ 'selected' if c == f.value }}>{{ c }}</option>{% endfor %}</select>
+    {% elif f.secret %}
+      <input id="f_{{ f.key }}" type="password" name="{{ f.key }}" placeholder="{{ '•••••••• (saved — leave blank to keep)' if f.value else '' }}" autocomplete="new-password" {{ 'disabled' if f.locked }}>
+    {% elif f.type == 'json' %}
+      <input id="f_{{ f.key }}" type="text" name="{{ f.key }}" value="{{ f.value }}" class="mono" {{ 'disabled' if f.locked }}>
+    {% else %}
+      <input id="f_{{ f.key }}" type="{{ 'number' if f.type in ('int','float') else 'text' }}" {{ 'step=any' if f.type == 'float' }} name="{{ f.key }}" value="{{ f.value }}" {{ 'disabled' if f.locked }}>
+    {% endif %}
+  {% endif %}
+  {% if f.help %}<div class="help">{{ f.help }}</div>{% endif %}
+  {% if f.locked %}<div class="help">🔒 Set by {{ f.locked }} — change it there.</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro copy_field(id, value) -%}
+<div class="copy"><input type="text" id="{{ id }}" value="{{ value }}" readonly><button type="button" class="btn sm" data-copy="{{ id }}">Copy</button></div>
+{%- endmacro %}
+
+{% macro status_pill(s) -%}<span class="pill {{ s }}">{{ s|replace('_',' ') }}</span>{%- endmacro %}
+
+{% macro item_thumb(it) -%}
+{% if it and it.photo %}<img class="thumb" src="/uploads/{{ it.photo }}" alt="" loading="lazy">
+{% elif it and it.image_url %}<img class="thumb" src="{{ it.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+{% else %}<span class="thumb"></span>{% endif %}
+{%- endmacro %}

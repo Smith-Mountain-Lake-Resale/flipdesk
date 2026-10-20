@@ -1,0 +1,72 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}{% from "_m.html" import status_pill, item_thumb %}
+{% block title %}{{ it.title }}{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div class="row" style="align-items:flex-start">
+    {% if it.photo or it.image_url %}<img src="{{ '/uploads/' ~ it.photo if it.photo else it.image_url }}" style="width:88px;height:88px;border-radius:10px;object-fit:cover" referrerpolicy="no-referrer" alt="">{% endif %}
+    <div><h1>{{ it.title }}</h1><div class="sub">{{ status_pill(it.status) }} · #{{ it.id }}{% if it.sku %} · SKU <span class="mono">{{ it.sku }}</span>{% endif %}{% if it.bulk_buy %} · bulk buy <a href="/bulk-buys/{{ it.bulk_buy_id }}">{{ it.bulk_buy.name }}</a>{% endif %}</div></div>
+  </div>
+  <div class="row">
+    <a class="btn" href="/sales/new?item={{ it.id }}">Record a sale</a>
+    <a class="btn primary" href="/inventory/{{ it.id }}/edit">Edit</a>
+  </div>
+</div>
+{% set live = it.sales|rejectattr('status','equalto','cancelled')|list %}
+<div class="grid g4">
+  <div class="card kpi"><div class="l">Cost</div><div class="v">{{ it.cost|money }}</div><div class="s">{{ it.quantity }} unit(s){% if it.quantity > 1 and it.unit_cost %} · {{ it.unit_cost|money }} each{% endif %}</div></div>
+  <div class="card kpi"><div class="l">Location</div><div class="v" style="font-size:18px">{{ it.storage_location or '—' }}</div><div class="s">Source: {{ it.source or '—' }}</div></div>
+  <div class="card kpi"><div class="l">Bought / listed</div><div class="v" style="font-size:18px">{{ it.purchase_date|dt }}</div><div class="s">Listed {{ it.listed_at|dt }}</div></div>
+  <div class="card kpi"><div class="l">Net profit</div>{% set np = live|sum(attribute='net_profit') %}<div class="v {{ 'pos' if np >= 0 else 'neg' }}">{{ np|money if live else '—' }}</div><div class="s">{{ it.quantity_sold }} sold</div></div>
+</div>
+<div class="grid g2">
+  <div>
+    <div class="card" style="padding:0">
+      <div style="padding:14px 16px 4px"><h2>eBay listings</h2><div class="sub">Every listing ID this item has had — history is kept across relists.</div></div>
+      <table>
+        <tr><th>Item #</th><th>Status</th><th>Started</th><th class="r">Price</th><th class="r">Watchers</th></tr>
+        {% for l in it.listings|sort(attribute='id', reverse=True) %}
+        <tr><td class="mono small"><a href="https://www.ebay.com/itm/{{ l.ebay_item_id }}" target="_blank" rel="noopener">{{ l.ebay_item_id }}</a></td><td>{{ status_pill(l.status) }}{% if l.promoted %} <span class="pill info">promoted</span>{% endif %}</td><td>{{ l.start_time|dt }}</td><td class="r">{{ l.price|money }}</td><td class="r">{{ l.watch_count or 0 }}</td></tr>
+        {% else %}<tr><td colspan="5" class="muted">Not linked to an eBay listing.</td></tr>{% endfor %}
+      </table>
+      {% if next_price %}<p class="small" style="padding:0 16px">Next relist will reprice to <b>{{ next_price|money }}</b>.</p>{% endif %}
+      <form method="post" action="/inventory/{{ it.id }}/link" class="row" style="padding:12px 16px">{{ csrf_input() }}
+        <input type="text" name="ebay_item_id" list="unlinked" placeholder="Link to eBay item #" style="flex:1">
+        <datalist id="unlinked">{% for l in unlinked %}<option value="{{ l.ebay_item_id }}">{{ l.title }}</option>{% endfor %}</datalist>
+        <button class="btn sm">Link listing</button>
+      </form>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="padding:14px 16px 4px"><h2>Sales</h2></div>
+      <table>
+        <tr><th>Date</th><th>Where</th><th>Status</th><th class="r">Gross</th><th class="r">Net</th></tr>
+        {% for s in it.sales|sort(attribute='sale_date', reverse=True) %}
+        <tr><td><a href="/sales/{{ s.id }}">{{ s.sale_date|dt }}</a></td><td>{{ s.marketplace }}</td><td>{{ status_pill(s.status) }}{% if s.restocked %} <span class="pill">restocked</span>{% endif %}</td><td class="r">{{ s.gross|money }}</td><td class="r">{{ s.net_profit|money }}</td></tr>
+        {% else %}<tr><td colspan="5" class="muted">No sales yet.</td></tr>{% endfor %}
+      </table>
+    </div>
+    <div class="card">
+      <h2>More</h2>
+      <form method="post" action="/inventory/{{ it.id }}/merge" class="row" style="margin-bottom:10px" data-confirm="Merge the other item into this one? Its listings, sales and timeline move here and it is deleted.">{{ csrf_input() }}
+        <input type="number" name="other_id" placeholder="Item # to merge into this one" style="flex:1"><button class="btn sm">Merge</button>
+      </form>
+      <div class="row">
+        <form method="post" action="/inventory/{{ it.id }}/writeoff" class="row inline" {% if it.status != 'written_off' %}data-confirm="Write this item off as lost, damaged or donated?"{% endif %}>{{ csrf_input() }}
+          {% if it.status != 'written_off' %}<input type="text" name="reason" placeholder="Reason (lost, damaged, donated…)" style="width:240px">{% endif %}
+          <button class="btn sm">{{ 'Restore to inventory' if it.status == 'written_off' else 'Write off' }}</button>
+        </form>
+        <span class="spacer"></span>
+        <form method="post" action="/inventory/{{ it.id }}/delete" class="inline" data-confirm="Delete this item permanently? Sales are kept but unlinked.">{{ csrf_input() }}<button class="btn sm danger">Delete</button></form>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Product timeline</h2>
+    <form method="post" action="/inventory/{{ it.id }}/note" class="row" style="margin-bottom:12px">{{ csrf_input() }}<input type="text" name="note" placeholder="Add a note to the timeline" style="flex:1"><button class="btn sm">Add</button></form>
+    <ul class="timeline">
+      {% for e in events %}<li><div class="when">{{ e.ts|dt('%Y-%m-%d %H:%M') }} · {{ e.kind }}{% if e.ebay_item_id %} · <span class="mono">{{ e.ebay_item_id }}</span>{% endif %}</div>{{ e.detail }}</li>
+      {% else %}<li class="muted">No history yet.</li>{% endfor %}
+    </ul>
+    {% if it.notes %}<h3 style="margin-top:16px">Notes</h3><p style="white-space:pre-line">{{ it.notes }}</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

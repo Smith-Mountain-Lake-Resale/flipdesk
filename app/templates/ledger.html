@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}{% from "_m.html" import period_picker %}
+{% block title %}Expense ledger{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Expense ledger</h1><div class="sub">{{ label }} · Business costs by Schedule C category. eBay store subscriptions and fees not tied to an order are added automatically.</div></div>
+  {{ period_picker('/ledger', period, p) }}
+</div>
+<div class="grid g2" style="grid-template-columns:2fr 1fr">
+  <div>
+    <form class="filters" method="get"><input type="hidden" name="period" value="{{ period }}">
+      <select name="category" onchange="this.form.submit()"><option value="">All categories</option>{% for c, l, d in categories %}<option {{ 'selected' if p.get('category') == c }}>{{ c }}</option>{% endfor %}</select></form>
+    <div class="tbl"><table>
+      <tr><th>Date</th><th>Category</th><th>Description</th><th>Vendor</th><th class="r">Amount</th><th></th></tr>
+      {% for e in rows %}
+      <tr><td class="nowrap">{{ e.expense_date|dt }}</td><td>{{ e.category }}{% if e.source == 'ebay_sync' %} <span class="pill info">eBay</span>{% endif %}</td>
+        <td class="trunc">{{ e.description or '' }}{% if e.receipt %} · <a href="/uploads/{{ e.receipt }}" target="_blank">receipt</a>{% endif %}</td><td>{{ e.vendor or '' }}</td>
+        <td class="r">{{ e.amount|money }}</td>
+        <td class="nowrap"><a class="btn sm" href="?period={{ period }}&edit={{ e.id }}">Edit</a>
+          <form class="inline" method="post" action="/ledger/{{ e.id }}/delete" data-confirm="Delete this expense?">{{ csrf_input() }}<button class="btn sm danger">✕</button></form></td></tr>
+      {% else %}<tr><td colspan="6" class="empty">No expenses in this period.</td></tr>{% endfor %}
+      {% if rows %}<tr><td colspan="4"><b>Total</b></td><td class="r"><b>{{ total|money }}</b></td><td></td></tr>{% endif %}
+    </table></div>
+  </div>
+  <div>
+    <div class="card" id="form">
+      <h2>{{ 'Edit expense' if edit else 'Add expense' }}</h2>
+      <form method="post" action="/ledger/save" enctype="multipart/form-data">{{ csrf_input() }}
+        <input type="hidden" name="period" value="{{ period }}">{% if edit %}<input type="hidden" name="id" value="{{ edit.id }}">{% endif %}
+        <div class="fields">
+          <div class="field"><label>Date</label><input type="date" name="expense_date" value="{{ edit.expense_date if edit else today }}"></div>
+          <div class="field"><label>Amount</label><input type="number" step="0.01" name="amount" value="{{ edit.amount if edit else '' }}" required></div>
+        </div>
+        <div class="field"><label>Category</label><select name="category">{% for c, l, d in categories %}<option value="{{ c }}" {{ 'selected' if edit and edit.category == c }}>{{ c }} (line {{ l }})</option>{% endfor %}</select></div>
+        <div class="field"><label>Description</label><input type="text" name="description" value="{{ edit.description or '' if edit else '' }}"></div>
+        <div class="field"><label>Vendor</label><input type="text" name="vendor" value="{{ edit.vendor or '' if edit else '' }}"></div>
+        <div class="field"><label>Receipt (image or PDF)</label><input type="file" name="receipt" accept="image/*,application/pdf"></div>
+        <div class="row"><button class="btn primary">Save</button>{% if edit %}<a class="btn" href="/ledger?period={{ period }}">Cancel</a>{% endif %}</div>
+      </form>
+    </div>
+    <div class="card"><h3>By category</h3>
+      <table class="stmt">{% for c, v in by_cat %}<tr><td>{{ c }}</td><td class="r">{{ v|money }}</td></tr>{% endfor %}</table>
+    </div>
+  </div>
+</div>
+{% endblock %}

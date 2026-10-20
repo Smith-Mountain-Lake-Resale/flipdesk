@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}Sign in{% endblock %}
+{% block bare %}
+<div class="login">
+  <div class="brand" style="color:var(--ink);padding:0 0 16px"><span class="dot">⇄</span>{{ APP_NAME }}</div>
+  <div class="card">
+    <h2>Sign in</h2>
+    {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+    <form method="post" action="/login">{{ csrf_input() }}
+      <input type="hidden" name="next" value="{{ next }}">
+      <div class="field"><label>Username</label><input type="text" name="username" autofocus autocomplete="username"></div>
+      <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password"></div>
+      <button class="btn primary" style="width:100%;justify-content:center">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

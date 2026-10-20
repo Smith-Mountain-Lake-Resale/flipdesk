@@ -1,0 +1,105 @@
+{% extends "base.html" %}{% from "_m.html" import period_picker, status_pill, item_thumb %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+{% set s = d.summary %}
+<div class="topbar">
+  <div><h1>Dashboard</h1><div class="sub">{{ label }}{% if acct %} · eBay: {{ acct.username or 'connected' }}{% if acct.orders_synced_at %} · synced {{ acct.orders_synced_at|dt('%b %d %H:%M') }} UTC{% endif %}{% endif %}</div></div>
+  {{ period_picker('/', period, p) }}
+</div>
+{% if not acct %}<div class="note warn">eBay isn't connected yet. <a href="/settings/ebay">Connect your eBay account</a> to sync listings, sales, fees and labels automatically — or start by adding inventory and recording sales manually.</div>{% endif %}
+{% for c in checks %}<div class="note warn">⚠️ {{ c.label }} this year: {{ c.count }} — <a href="{{ c.link }}">fix now</a>. {{ c.help }}</div>{% endfor %}
+
+<div class="grid g4">
+  <div class="card kpi"><div class="l">Gross sales</div><div class="v">{{ s.gross|money }}</div><div class="s">{{ s.units }} units · {{ s.orders }} orders</div></div>
+  <div class="card kpi"><div class="l">Net profit</div><div class="v {{ 'pos' if s.net >= 0 else 'neg' }}">{{ s.net|money }}</div><div class="s">after fees, shipping, ads &amp; cost</div></div>
+  <div class="card kpi"><div class="l">Net margin</div><div class="v">{{ s.margin|pct }}</div><div class="s">ROI {{ s.roi|pct }}</div></div>
+  <div class="card kpi"><div class="l">Avg sale</div><div class="v">{{ s.avg_sale|money }}</div><div class="s">{% if s.missing_cost %}<a href="/sales?missing=cost&period={{ period }}">{{ s.missing_cost }} sales missing cost</a>{% else %}all sales have a cost{% endif %}</div></div>
+</div>
+
+<div class="grid g2">
+  <div class="card"><h3>Gross sales vs net profit</h3><div class="chart"><canvas id="c_sales"></canvas></div></div>
+  <div class="card"><h3>New listings vs items sold</h3><div class="chart"><canvas id="c_list"></canvas></div></div>
+</div>
+
+<div class="grid g4">
+  <div class="card kpi"><div class="l">Inventory spend</div><div class="v">{{ d.inventory_spend|money }}</div><div class="s">bought in this period</div></div>
+  <div class="card kpi"><div class="l">Cost of goods sold</div><div class="v">{{ s.cogs|money }}</div><div class="s">Fees {{ s.fees|money }} · Ads {{ s.ads|money }}</div></div>
+  <div class="card kpi"><div class="l">Shipping labels</div><div class="v">{{ s.shipping|money }}</div><div class="s">Refunds {{ s.refunds|money }}</div></div>
+  <div class="card kpi"><div class="l">Avg time to list / sell</div><div class="v">{{ d.avg_days_to_list if d.avg_days_to_list is not none else '—' }} / {{ d.avg_days_to_sell if d.avg_days_to_sell is not none else '—' }}<span class="small muted"> days</span></div><div class="s">{{ d.new_listings }} new listings</div></div>
+</div>
+
+<div class="grid g3">
+  <div class="card"><h3>Net profit by marketplace</h3><div class="chart sm"><canvas id="c_mkt"></canvas></div></div>
+  <div class="card"><h3>Top 10 sources by net profit</h3><div class="chart sm"><canvas id="c_src"></canvas></div></div>
+  <div class="card"><h3>Active listings by source</h3>{% if d.listings_by_source %}<div class="chart sm"><canvas id="c_lbs"></canvas></div>{% else %}<div class="empty">No active listings</div>{% endif %}</div>
+</div>
+
+<div class="grid g3">
+  <div class="card">
+    <h3>Inventory now</h3>
+    <table class="stmt">
+      <tr><td>Listed items</td><td class="r">{{ inv.listed }}</td><td class="r">{{ inv.listed_cost|money }}</td></tr>
+      <tr><td>Unlisted items</td><td class="r">{{ inv.unlisted }}</td><td class="r">{{ inv.unlisted_cost|money }}</td></tr>
+      <tr class="total"><td>Inventory at cost</td><td></td><td class="r">{{ (inv.listed_cost + inv.unlisted_cost)|money }}</td></tr>
+      <tr><td>Active listing value</td><td></td><td class="r">{{ inv.active_value|money }}</td></tr>
+    </table>
+    {% if inv.missing_cost %}<p class="small"><a href="/inventory/quick-edit?missing=cost">{{ inv.missing_cost }} items need a cost →</a></p>{% endif %}
+  </div>
+  <div class="card">
+    <h3>Where your buyers are — states/provinces</h3>
+    {% set mx = (d.states[0][1] if d.states else 1) %}
+    {% for st, n in d.states[:10] %}
+      <div class="row small" style="margin:4px 0"><span style="width:44px">{{ st }}</span><div class="bar" style="flex:1"><i style="width:{{ (n / mx * 100)|round }}%"></i></div><span class="muted" style="width:30px;text-align:right">{{ n }}</span></div>
+    {% else %}<div class="empty">No buyer data yet</div>{% endfor %}
+  </div>
+  <div class="card">
+    <h3>Buyers by country</h3>
+    {% set mc = (d.countries[0][1] if d.countries else 1) %}
+    {% for c, n in d.countries[:10] %}
+      <div class="row small" style="margin:4px 0"><span style="width:44px">{{ c }}</span><div class="bar" style="flex:1"><i style="width:{{ (n / mc * 100)|round }}%"></i></div><span class="muted" style="width:30px;text-align:right">{{ n }}</span></div>
+    {% else %}<div class="empty">No buyer data yet</div>{% endfor %}
+  </div>
+</div>
+
+<div class="card" style="padding:0">
+  <div class="row" style="padding:14px 16px 6px"><h2 style="margin:0">Recently sold</h2><span class="spacer"></span><a href="/sales?period={{ period }}">All sales →</a></div>
+  <div class="tbl" style="border:0;border-radius:0">
+  <table>
+    <tr><th></th><th>Item</th><th>Date</th><th>Where</th><th class="r">Sale</th><th class="r">Cost</th><th class="r">Net profit</th><th class="r">ROI</th></tr>
+    {% for x in d.sales[:15] %}
+    <tr>
+      <td style="width:50px">{{ item_thumb(x.item) }}</td>
+      <td class="trunc"><a href="/sales/{{ x.id }}">{{ x.title }}</a> {% if x.status != 'completed' %}{{ status_pill(x.status) }}{% endif %}</td>
+      <td class="nowrap">{{ x.sale_date|dt('%b %d') }}</td><td>{{ x.marketplace }}</td>
+      <td class="r">{{ x.gross|money }}</td>
+      <td class="r">{% if x.cogs is none %}<a href="/inventory/{{ x.item_id }}/edit" class="small">add cost</a>{% else %}{{ x.cogs|money }}{% endif %}</td>
+      <td class="r {{ 'pos' if x.net_profit >= 0 else 'neg' }}">{{ x.net_profit|money }}</td>
+      <td class="r">{{ x.roi|pct }}</td>
+    </tr>
+    {% else %}<tr><td colspan="8" class="empty">No sales in this period.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+window.addEventListener('load', () => {
+  FD.base(); const pal = FD.palette();
+  const S = {{ series_json|safe }};
+  const money = { ticks: { callback: v => FD.money(v) } };
+  new Chart(c_sales, { type: 'line', data: { labels: S.labels, datasets: [
+    { label: 'Gross sales', data: S.gross, borderColor: pal[1], backgroundColor: pal[1] + '22', fill: true, tension: .3, pointRadius: 0 },
+    { label: 'Net profit', data: S.net, borderColor: pal[0], backgroundColor: pal[0] + '22', fill: true, tension: .3, pointRadius: 0 }]},
+    options: { interaction: { mode: 'index', intersect: false }, scales: { y: money }, plugins: { tooltip: { callbacks: { label: c => c.dataset.label + ': ' + FD.money(c.parsed.y) } } } } });
+  new Chart(c_list, { type: 'bar', data: { labels: S.labels, datasets: [
+    { label: 'New listings', data: S.listings, backgroundColor: pal[1] },
+    { label: 'Items sold', data: S.sales, backgroundColor: pal[0] }]}, options: { interaction: { mode: 'index', intersect: false } } });
+  const M = {{ mkt_json|safe }}, R = {{ src_json|safe }}, L = {{ lbs_json|safe }};
+  new Chart(c_mkt, { type: 'bar', data: { labels: M.labels, datasets: [{ label: 'Net profit', data: M.net, backgroundColor: pal[0] }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: money } } });
+  new Chart(c_src, { type: 'bar', data: { labels: R.labels, datasets: [{ label: 'Net profit', data: R.net, backgroundColor: pal[0] }] },
+    options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: money } } });
+  if (window.c_lbs) new Chart(c_lbs, { type: 'doughnut', data: { labels: L.labels, datasets: [{ data: L.count, backgroundColor: pal, borderWidth: 0 }] },
+    options: { plugins: { legend: { position: 'right' } } } });
+});
+</script>
+{% endblock %}

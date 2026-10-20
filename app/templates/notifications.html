@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}Alerts{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Alerts</h1><div class="sub">Sale alerts (with where the item is stored) and detected problems. Push them to your phone in <a href="/settings?tab=alerts">Settings → Alerts</a>.</div></div>
+<form method="post" action="/notifications/read">{{ csrf_input() }}<button class="btn">Mark all read</button></form></div>
+<div class="tbl"><table>
+  <tr><th>When (UTC)</th><th>Alert</th><th></th></tr>
+  {% for n in rows %}<tr style="{{ 'font-weight:600' if not n.read }}"><td class="nowrap">{{ n.ts|dt('%Y-%m-%d %H:%M') }}</td>
+    <td>{{ n.title }}<div class="small muted" style="white-space:pre-line;font-weight:400">{{ (n.body or '').split('\n[')[0] }}</div></td>
+    <td>{% if n.link %}<a class="btn sm" href="{{ n.link }}">Open</a>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="3" class="empty">No alerts yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

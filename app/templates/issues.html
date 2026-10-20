@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% from "_m.html" import status_pill %}
+{% block title %}Error detection{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Error detection</h1><div class="sub">Duplicate label charges, label cost adjustments, fee refunds, failed relists and sync problems — the stuff that slips by silently.</div></div></div>
+<div class="tbl"><table>
+  <tr><th>Severity</th><th>Type</th><th>What happened</th><th>Date</th><th></th></tr>
+  {% for i in issues %}
+  <tr><td>{{ status_pill(i.severity) }}</td><td class="nowrap">{{ i.kind }}</td><td><b>{{ i.title }}</b>{% if i.detail %}<div class="small muted">{{ i.detail }}</div>{% endif %}</td>
+    <td class="nowrap">{{ i.date|dt }}</td><td>{% if i.link %}<a class="btn sm" href="{{ i.link }}">Open</a>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="5" class="empty">✓ Nothing to review.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}{% from "_m.html" import period_picker %}
+{% block title %}Mileage{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Mileage</h1><div class="sub">{{ label }} · Sourcing and business trips, rolled into Schedule C line 9 at the IRS standard rate ({{ rate }}/mi this year — <a href="/settings?tab=tax">rates</a>).</div></div>
+  {{ period_picker('/mileage', period, p) }}
+</div>
+<div class="grid g3">
+  <div class="card kpi"><div class="l">Miles</div><div class="v">{{ '{:,.1f}'.format(total_miles) }}</div></div>
+  <div class="card kpi"><div class="l">Deduction</div><div class="v pos">{{ deduction|money }}</div></div>
+  <div class="card kpi"><div class="l">Trips</div><div class="v">{{ rows|length }}</div></div>
+</div>
+<div class="grid g2" style="grid-template-columns:2fr 1fr">
+  <div class="tbl"><table>
+    <tr><th>Date</th><th>Purpose</th><th>From → To</th><th class="r">Miles</th><th></th></tr>
+    {% for m in rows %}
+    <tr><td>{{ m.trip_date|dt }}</td><td>{{ m.purpose or '' }}</td><td class="small">{{ m.start_location or '' }}{% if m.end_location %} → {{ m.end_location }}{% endif %}</td>
+      <td class="r">{{ m.total_miles }}{% if m.round_trip %} <span class="muted small">(rt)</span>{% endif %}</td>
+      <td class="nowrap"><a class="btn sm" href="?edit={{ m.id }}">Edit</a><form class="inline" method="post" action="/mileage/{{ m.id }}/delete" data-confirm="Delete this trip?">{{ csrf_input() }}<button class="btn sm danger">✕</button></form></td></tr>
+    {% else %}<tr><td colspan="5" class="empty">No trips logged.</td></tr>{% endfor %}
+  </table></div>
+  <div class="card">
+    <h2>{{ 'Edit trip' if edit else 'Log a trip' }}</h2>
+    <form method="post" action="/mileage/save">{{ csrf_input() }}{% if edit %}<input type="hidden" name="id" value="{{ edit.id }}">{% endif %}
+      <div class="fields">
+        <div class="field"><label>Date</label><input type="date" name="trip_date" value="{{ edit.trip_date if edit else today }}"></div>
+        <div class="field"><label>Miles (one way)</label><input type="number" step="0.1" name="miles" value="{{ edit.miles if edit else '' }}" required></div>
+      </div>
+      <label class="check"><input type="checkbox" name="round_trip" {{ 'checked' if edit and edit.round_trip }}> Round trip (doubles miles)</label>
+      <div class="field" style="margin-top:8px"><label>Purpose</label><input type="text" name="purpose" value="{{ edit.purpose or '' if edit else '' }}" placeholder="Sourcing — estate sale"></div>
+      <div class="fields">
+        <div class="field"><label>From</label><input type="text" name="start_location" value="{{ edit.start_location or '' if edit else '' }}"></div>
+        <div class="field"><label>To</label><input type="text" name="end_location" value="{{ edit.end_location or '' if edit else '' }}"></div>
+      </div>
+      <div class="row"><button class="btn primary">Save</button>{% if edit %}<a class="btn" href="/mileage">Cancel</a>{% endif %}</div>
+    </form>
+    <p class="small muted">Keep a contemporaneous log — the IRS expects date, miles and business purpose for each trip.</p>
+  </div>
+</div>
+{% endblock %}
