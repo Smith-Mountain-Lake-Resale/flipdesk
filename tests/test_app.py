@@ -147,6 +147,15 @@ def get_ok(c, url):
 
 def main():
     with TestClient(app) as c:
+        # PWA endpoints are public (browsers fetch them without cookies)
+        m = c.get("/manifest.webmanifest")
+        assert m.status_code == 200 and m.json()["display"] == "standalone" and m.headers["content-type"].startswith("application/manifest+json")
+        for ic in m.json()["icons"] + [s["icons"][0] for s in m.json()["shortcuts"]]:
+            assert c.get(ic["src"]).status_code == 200, ic
+        sw = c.get("/sw.js")
+        assert sw.status_code == 200 and "javascript" in sw.headers["content-type"] and "flipdesk-" in sw.text
+        assert "You're offline" in c.get("/offline").text
+        assert c.get("/favicon.ico", follow_redirects=False).status_code == 301
         # first run → setup
         r = c.get("/", follow_redirects=False)
         assert r.headers["location"] == "/setup"
