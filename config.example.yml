@@ -1,0 +1,31 @@
+# Copy to ./config/config.yml (mapped to /config/config.yml in the container).
+# Every key can also be set as an environment variable (UPPER_CASE, nested keys joined with _).
+# Precedence: environment variable > this file > value saved in the web UI > default.
+# Anything set here shows as locked (read-only) in the web UI.
+
+public_url: https://flip.example.com      # HTTPS address eBay redirects to / sends notifications to
+
+# ---- database: pick one
+db_type: sqlite                            # sqlite (default, file in /data) | postgres | mysql
+# db_host: 192.168.1.20
+# db_port: 5432
+# db_name: flipdesk
+# db_user: flipdesk
+# db_password: secret
+# database_url: postgresql+psycopg://flipdesk:secret@192.168.1.20:5432/flipdesk   # overrides db_*
+
+# ---- eBay developer keys (or enter them in the web UI)
+ebay:
+  environment: production                  # production | sandbox
+  # client_id: YourName-FlipDesk-PRD-xxxxxxxx-xxxxxxxx
+  # client_secret: PRD-xxxxxxxxxxxx
+  # runame: Your_Name-YourName-FlipDe-xxxxxxxx
+  marketplace_id: EBAY_US
+  # verification_token: generated automatically if not set (32-80 chars)
+
+# ---- optional
+# secret_key: set your own instead of the auto-generated /config/secret.key
+# auth_mode: local            # local (login page) | none (only behind an authenticating reverse proxy!)
+# session_cookie_secure: true # set when served only over HTTPS
+# ntfy_url: https://ntfy.sh/my-flip-sales
+# sync_orders_minutes: 15
