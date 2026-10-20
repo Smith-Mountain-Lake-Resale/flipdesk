@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input, setting_field with context %}{% from "_m.html" import status_pill %}
+{% block title %}Automations{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Automations</h1><div class="sub">End &amp; relist before eBay's auto-renew, reprice aging inventory, and promote only what isn't selling on its own.</div></div>
+  <div class="row">
+    <form class="inline" method="post" action="/sync/relist">{{ csrf_input() }}<button class="btn">Run relist now</button></form>
+    <form class="inline" method="post" action="/sync/promote">{{ csrf_input() }}<button class="btn">Run promotion now</button></form>
+  </div>
+</div>
+{% if dry %}<div class="note warn"><b>Dry-run mode is on.</b> Automations only write to the log below — nothing changes on eBay. Review the log, then turn dry-run off.</div>{% endif %}
+<div class="grid g2">
+  <div class="card">
+    <form method="post" action="/settings/automation">{{ csrf_input() }}
+      <h2>Settings</h2>
+      {% for f in fields %}{{ setting_field(f) }}{% endfor %}
+      <button class="btn primary">Save</button>
+    </form>
+    <details style="margin-top:12px" {{ 'open' if campaigns or camp_err }}><summary>Find my campaign ID</summary>
+      <p class="small">Create a <b>Promoted Listings General</b> (cost-per-sale) campaign in Seller Hub → Marketing → Advertising, choosing to <b>select listings individually</b> and adding none. Then:</p>
+      <a class="btn sm" href="?campaigns=1">Load my campaigns from eBay</a>
+      {% if camp_err %}<div class="note bad" style="margin-top:8px">{{ camp_err }}</div>{% endif %}
+      {% if campaigns %}<table style="margin-top:8px"><tr><th>Name</th><th>ID</th><th>Status</th><th>Model</th></tr>
+        {% for c in campaigns %}<tr><td>{{ c.name }}</td><td class="mono small">{{ c.id }}</td><td>{{ c.status }}</td><td class="small">{{ c.strategy }}{% if c.rate %} {{ c.rate }}%{% endif %}</td></tr>{% endfor %}</table>{% endif %}
+    </details>
+    <details style="margin-top:8px"><summary>How end &amp; relist works</summary>
+      <p class="small">Good-'Til-Cancelled fixed-price listings renew every 30 days. Shortly before renewal FlipDesk ends the listing and immediately relists it (Trading API <code>EndFixedPriceItem</code> → <code>RelistFixedPriceItem</code>), giving a new item ID and fresh start date. If repricing is on, the new price is lowered by your percentage, never below the item's minimum price or your maximum total reduction. If a relist fails after the end succeeds, FlipDesk flags it and retries every run until it's back up. Per-item switches live on each item's edit page.</p>
+    </details>
+  </div>
+  <div>
+    <div class="card" style="padding:0">
+      <div style="padding:14px 16px 4px"><h2>Renewing in the next 48 hours</h2></div>
+      <table><tr><th>Listing</th><th>Renews (UTC)</th><th class="r">Price</th><th class="r">Next price</th></tr>
+      {% for l, np in upcoming %}<tr><td class="trunc" style="max-width:260px">{% if l.item_id %}<a href="/inventory/{{ l.item_id }}">{{ l.title }}</a>{% else %}{{ l.title }}{% endif %}</td><td class="nowrap">{{ l.end_time|dt('%b %d %H:%M') }}</td><td class="r">{{ l.price|money }}</td><td class="r">{{ np|money if np else '—' }}</td></tr>
+      {% else %}<tr><td colspan="4" class="empty">Nothing renews in the next 48 hours.</td></tr>{% endfor %}</table>
+      {% set due = relist|selectattr(1, 'equalto', 'due')|list %}
+      <p class="small" style="padding:6px 16px">{{ due|length }} listing(s) inside the relist window now.{% for l, r in relist if r != 'due' %}<br><span class="muted">{{ l.title[:50] }} — {{ r }}</span>{% endfor %}</p>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="padding:14px 16px 4px"><h2>Ready to promote</h2><div class="sub">Unsold past the delay and not yet promoted.</div></div>
+      <table>{% for l in promote[:12] %}<tr><td class="trunc" style="max-width:320px">{{ l.title }}</td><td class="r">{{ l.price|money }}</td></tr>{% else %}<tr><td class="empty">None right now.</td></tr>{% endfor %}</table>
+    </div>
+  </div>
+</div>
+<div class="card" style="padding:0">
+  <div style="padding:14px 16px 4px"><h2>Automation log</h2></div>
+  <div class="tbl" style="border:0;max-height:520px"><table>
+    <tr><th>When (UTC)</th><th>Action</th><th>Result</th><th>Detail</th><th>Item #</th></tr>
+    {% for g in logs %}<tr><td class="nowrap">{{ g.ts|dt('%m-%d %H:%M') }}</td><td>{{ g.action }}</td><td>{{ status_pill(g.status) }}</td><td class="small">{{ g.message }}</td>
+      <td class="mono small">{{ g.ebay_item_id or '' }}{% if g.new_ebay_item_id %} → {{ g.new_ebay_item_id }}{% endif %}</td></tr>
+    {% else %}<tr><td colspan="5" class="empty">No automation activity yet.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}
