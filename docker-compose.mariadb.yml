@@ -1,0 +1,44 @@
+# FlipDesk with an external MariaDB / MySQL database.
+services:
+  flipdesk:
+    build: .
+    image: flipdesk:latest
+    container_name: flipdesk
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: America/New_York
+      PUID: 1000
+      PGID: 1000
+      PUBLIC_URL: https://flip.example.com
+      DB_TYPE: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: flipdesk
+      DB_USER: flipdesk
+      DB_PASSWORD: change-me-please
+    volumes:
+      - ./data:/data
+      - ./config:/config
+
+  db:
+    image: mariadb:11
+    container_name: flipdesk-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: flipdesk
+      MARIADB_USER: flipdesk
+      MARIADB_PASSWORD: change-me-please
+      MARIADB_ROOT_PASSWORD: change-me-root
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - ./mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
