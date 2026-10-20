@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 from sqlalchemy.orm import Session
 
@@ -60,6 +61,27 @@ REGISTRY: dict[str, tuple] = {
     "SMTP_FROM": ("", "str", False, "alerts", "From address", ""),
     "SMTP_TO": ("", "str", False, "alerts", "Send alerts to", ""),
     "SMTP_STARTTLS": ("true", "bool", False, "alerts", "Use STARTTLS", ""),
+    # ---- authentication: MFA
+    "MFA_REQUIRED": ("false", "bool", False, "auth", "Require two-factor authentication (TOTP) for everyone", "Users without an authenticator are sent to set one up right after signing in, and can't use the app until they do."),
+    "MFA_REQUIRED_FOR_OIDC": ("false", "bool", False, "auth", "Also require FlipDesk TOTP for SSO (OIDC) users", "Off = trust your identity provider's MFA. Turn on if your IdP doesn't enforce MFA."),
+    "MFA_ISSUER_NAME": ("FlipDesk", "str", False, "auth", "Name shown in authenticator apps", ""),
+    # ---- authentication: OIDC
+    "OIDC_ENABLED": ("false", "bool", False, "oidc", "Enable OpenID Connect (SSO) sign-in", "Works with Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Microsoft Entra ID, Google, Okta…"),
+    "OIDC_DISPLAY_NAME": ("SSO", "str", False, "oidc", "Button label", "Shown as “Sign in with …”"),
+    "OIDC_ISSUER": ("", "str", False, "oidc", "Issuer URL", "e.g. https://auth.example.com/application/o/flipdesk/ — FlipDesk reads <issuer>/.well-known/openid-configuration."),
+    "OIDC_CLIENT_ID": ("", "str", False, "oidc", "Client ID", ""),
+    "OIDC_CLIENT_SECRET": ("", "str", True, "oidc", "Client secret", "Leave blank for a public client (PKCE is always used). Stored encrypted."),
+    "OIDC_SCOPES": ("openid email profile", "str", False, "oidc", "Scopes", "Add `groups` (or your IdP's equivalent) to use group rules."),
+    "OIDC_USERNAME_CLAIM": ("preferred_username", "str", False, "oidc", "Username claim", "Falls back to email, then sub."),
+    "OIDC_GROUPS_CLAIM": ("groups", "str", False, "oidc", "Groups claim", "Also accepts dotted paths like realm_access.roles."),
+    "OIDC_AUTO_CREATE": ("true", "bool", False, "oidc", "Create users automatically on first SSO sign-in", "Off = only existing FlipDesk users (linked by previous SSO sign-in or matching verified email) may sign in."),
+    "OIDC_ALLOWED_GROUPS": ("", "str", False, "oidc", "Allowed groups (comma separated)", "Blank = anyone your IdP lets through."),
+    "OIDC_ADMIN_GROUPS": ("", "str", False, "oidc", "Admin groups (comma separated)", "Members get admin; non-members lose it at next sign-in. Blank = don't manage admin from SSO."),
+    "OIDC_NEW_USERS_ADMIN": ("false", "bool", False, "oidc", "Make auto-created users admins", "Only used when Admin groups is blank. The very first user of a fresh install is always an admin."),
+    "OIDC_LINK_BY_EMAIL": ("true", "bool", False, "oidc", "Link to an existing user with the same verified email", "Lets a local account start using SSO."),
+    "OIDC_ALLOW_UNVERIFIED_EMAIL": ("false", "bool", False, "oidc", "Trust email even if email_verified is missing/false", "Some IdPs (e.g. Entra ID) don't send email_verified. Only enable if your IdP controls email addresses."),
+    "OIDC_DISABLE_PASSWORD_LOGIN": ("false", "bool", False, "oidc", "Disable username/password login", "SSO only. Recover with the CLI or by setting OIDC_DISABLE_PASSWORD_LOGIN=false in the environment."),
+    "OIDC_AUTO_REDIRECT": ("false", "bool", False, "oidc", "Go straight to SSO from the login page", "Add ?local=1 to the login URL to see the form."),
     # ---- tax / general
     "TAX_METHOD": ("accrual", "choice:accrual,cash", False, "tax", "Default tax-report inventory method", "Accrual: cost is deducted when the item sells (COGS). Cash: inventory purchases are deducted when paid."),
     "MILEAGE_RATES": ('{"2023": 0.655, "2024": 0.67, "2025": 0.70, "2026": 0.725}', "json", False, "tax", "IRS standard mileage rate by year ($/mile)", "Add new years as the IRS publishes them."),
@@ -71,6 +93,8 @@ REGISTRY: dict[str, tuple] = {
 
 _cache: dict[str, str | None] = {}
 _lock = threading.Lock()
+_loaded_at = 0.0
+CACHE_TTL = 15  # seconds — picks up changes made by the CLI or another process
 
 
 def _load_cache(db: Session | None = None) -> None:
@@ -78,7 +102,9 @@ def _load_cache(db: Session | None = None) -> None:
     db = db or SessionLocal()
     try:
         rows = db.query(Setting).all()
+        global _loaded_at
         with _lock:
+            _loaded_at = time.time()
             _cache.clear()
             for r in rows:
                 _cache[r.key] = decrypt(r.value) if r.encrypted else r.value
@@ -100,7 +126,7 @@ def get(key: str):
     default, typ, *_ = REGISTRY.get(key, (None, "str", False))
     raw = config.get(key)
     if raw is None:
-        if not _cache:
+        if not _cache or time.time() - _loaded_at > CACHE_TTL:
             try:
                 _load_cache()
             except Exception:

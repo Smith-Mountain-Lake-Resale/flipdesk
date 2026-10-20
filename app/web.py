@@ -43,7 +43,14 @@ templates.env.globals["APP_NAME"] = config.APP_NAME
 templates.env.globals["APP_VERSION"] = config.APP_VERSION
 
 
-PUBLIC_PATHS = ("/login", "/setup", "/static/", "/health", "/ebay/account-deletion", "/privacy", "/favicon")
+PUBLIC_PATHS = ("/login", "/setup", "/static/", "/health", "/ebay/account-deletion", "/privacy", "/favicon",
+                "/auth/oidc/")
+
+# Paths a signed-in user may visit while they're required to set up MFA.
+ENROLL_PATHS = ("/account/mfa", "/logout", "/static/")
+
+# Admin-only areas (configuration, data, users).
+ADMIN_PATHS = ("/settings", "/data", "/sync/", "/ebay/connect", "/ebay/manual-code", "/jobs")
 
 
 def is_public(path: str) -> bool:
@@ -53,7 +60,21 @@ def is_public(path: str) -> bool:
 def current_user(request: Request) -> str | None:
     if config.AUTH_MODE == "none":
         return "admin"
-    return request.session.get("user")
+    u = getattr(request.state, "user", None)
+    if u is not None:
+        return u.display_name or u.username
+    return None
+
+
+def current_user_obj(request: Request):
+    return getattr(request.state, "user", None)
+
+
+def is_admin(request: Request) -> bool:
+    if config.AUTH_MODE == "none":
+        return True
+    u = current_user_obj(request)
+    return bool(u and u.is_admin)
 
 
 def csrf_token(request: Request) -> str:
@@ -81,7 +102,8 @@ def render(request: Request, name: str, ctx: dict | None = None, status_code: in
     msgs = request.session.pop("flash", []) if "session" in request.scope else []
     ctx.update(request=request, user=current_user(request), csrf=csrf_token(request), flashes=msgs,
                path=request.url.path, unread=getattr(request.state, "unread", 0),
-               auth_mode=config.AUTH_MODE)
+               auth_mode=config.AUTH_MODE, me=current_user_obj(request), admin=is_admin(request),
+               enrolling=bool(getattr(request.state, "must_enroll", False)))
     return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
 

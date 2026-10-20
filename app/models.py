@@ -14,9 +14,26 @@ class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(80), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[str] = mapped_column(String(255))  # "!" = no local password (SSO-only)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    auth_source: Mapped[str] = mapped_column(String(20), default="local")  # local | oidc
+    oidc_issuer: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    oidc_sub: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    totp_secret: Mapped[str | None] = mapped_column(Text, nullable=True)  # encrypted
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    totp_last_counter: Mapped[int] = mapped_column(Integer, default=0)   # replay protection
+    totp_enabled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    recovery_codes: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list of sha256 hashes
+    session_epoch: Mapped[int] = mapped_column(Integer, default=0)  # bump to sign out everywhere
+    last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    @property
+    def has_password(self) -> bool:
+        return bool(self.password_hash) and self.password_hash != "!"
 
 
 class Setting(Base):
