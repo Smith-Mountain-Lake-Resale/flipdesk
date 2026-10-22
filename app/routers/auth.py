@@ -3,14 +3,14 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import settings
 from ..db import get_db
 from ..models import User
-from ..services import authn, oidc
+from ..services import authn, oidc, passkeys
 from ..util import hash_password, verify_password
 from ..web import flash, form, redirect, render
 
@@ -32,6 +32,7 @@ def _public_base(request: Request) -> str:
 
 def _login_ctx(request: Request, **extra) -> dict:
     return {"oidc": oidc.enabled(), "oidc_name": settings.get("OIDC_DISPLAY_NAME") or "SSO",
+            "passkeys": passkeys.enabled(),
             "password_login": not (oidc.enabled() and settings.get("OIDC_DISABLE_PASSWORD_LOGIN")), **extra}
 
 
@@ -110,13 +111,17 @@ def _pending(request: Request, db: Session) -> User | None:
     return db.get(User, uid)
 
 
+def _mfa_ctx(u: User) -> dict:
+    return {"has_totp": bool(u.totp_enabled), "has_passkey": passkeys.enabled() and (u.passkey_count or 0) > 0}
+
+
 @router.get("/login/mfa")
 def mfa_page(request: Request, db: Session = Depends(get_db)):
     u = _pending(request, db)
     if not u:
         return redirect("/login", request, "Your sign-in timed out. Please sign in again.", "err")
     return render(request, "login_mfa.html", {"recovery": request.query_params.get("recovery") == "1",
-                                              "left": authn.recovery_codes_left(u)})
+                                              "left": authn.recovery_codes_left(u), **_mfa_ctx(u)})
 
 
 @router.post("/login/mfa")
@@ -128,7 +133,7 @@ async def mfa_submit(request: Request, db: Session = Depends(get_db)):
     key = f"mfa:{u.id}"
     wait = authn.mfa_throttle.blocked(key)
     recovery = f.get("mode") == "recovery"
-    ctx = {"recovery": recovery, "left": authn.recovery_codes_left(u)}
+    ctx = {"recovery": recovery, "left": authn.recovery_codes_left(u), **_mfa_ctx(u)}
     if wait:
         return render(request, "login_mfa.html", {**ctx, "error": f"Too many wrong codes. Wait {wait} seconds."}, 429)
     code = (f.get("code") or "").strip()
@@ -188,3 +193,56 @@ def oidc_callback(request: Request, db: Session = Depends(get_db)):
     if getattr(user, "_just_created", False):
         flash(request, f"Welcome, {user.display_name or user.username}! Your FlipDesk account was created from {settings.get('OIDC_DISPLAY_NAME') or 'SSO'}.")
     return redirect(step or nxt)
+
+
+# ------------------------------------------------------------------ passkeys
+def _json_csrf(request: Request) -> bool:
+    tok = request.headers.get("x-csrf-token")
+    return bool(tok) and tok == request.session.get("csrf")
+
+
+@router.post("/auth/passkey/options")
+async def passkey_options(request: Request, db: Session = Depends(get_db)):
+    if not _json_csrf(request):
+        return JSONResponse({"error": "Page expired — refresh and try again."}, 400)
+    if not passkeys.enabled():
+        return JSONResponse({"error": "Passkeys are turned off."}, 403)
+    second_step = request.query_params.get("step") == "mfa"
+    user = _pending(request, db) if second_step else None
+    if second_step and not user:
+        return JSONResponse({"error": "Your sign-in timed out. Please sign in again."}, 401)
+    if not second_step and oidc.enabled() and settings.get("OIDC_DISABLE_PASSWORD_LOGIN"):
+        return JSONResponse({"error": "Local sign-in is disabled. Use single sign-on."}, 403)
+    if second_step and not (user.passkey_count or 0):
+        return JSONResponse({"error": "No passkeys on this account."}, 400)
+    return Response(passkeys.authentication_options(request, db, user), media_type="application/json")
+
+
+@router.post("/auth/passkey/verify")
+async def passkey_verify(request: Request, db: Session = Depends(get_db)):
+    if not _json_csrf(request):
+        return JSONResponse({"error": "Page expired — refresh and try again."}, 400)
+    ip = authn.client_ip(request)
+    if authn.passkey_throttle.blocked(f"pk:{ip}"):
+        return JSONResponse({"error": "Too many failed attempts. Try again in a few minutes."}, 429)
+    try:
+        body = passkeys.parse_body(await request.body())
+        user, _verified = passkeys.authenticate(request, db, body.get("credential") or {})
+    except passkeys.PasskeyError as exc:
+        authn.passkey_throttle.fail(f"pk:{ip}")
+        return JSONResponse({"error": str(exc)}, 400)
+    pending = request.session.get("pending_uid")
+    if pending:  # second step after a password (or SSO when FlipDesk MFA is required for SSO)
+        if pending != user.id:
+            return JSONResponse({"error": "That passkey belongs to a different account."}, 400)
+        method = request.session.get("pending_method", "password")
+        nxt = _safe_next(request.session.get("login_next"))
+        authn.finish_login(request, db, user, method)
+        return JSONResponse({"redirect": nxt})
+    # passkey as the only step (discoverable credential, user verification required)
+    if oidc.enabled() and settings.get("OIDC_DISABLE_PASSWORD_LOGIN"):
+        return JSONResponse({"error": "Local sign-in is disabled. Use single sign-on."}, 403)
+    request.session["login_next"] = _safe_next(body.get("next"))
+    nxt = request.session["login_next"]
+    step = authn.begin_login(request, db, user, "passkey")
+    return JSONResponse({"redirect": step or nxt})
