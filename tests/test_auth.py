@@ -363,6 +363,12 @@ def main():
                        "email_verified": True, "groups": ["flip-admins"]})
         for u in ["/account", "/settings?tab=users", "/settings?tab=auth", "/settings?tab=oidc", "/"]:
             assert c.get(u).status_code == 200, u
+        # SSO accounts authenticate at the IdP — no passkeys
+        t = re.search(r'name="csrf-token" content="([^"]+)"', c.get("/account").text).group(1)
+        r = c.post("/account/passkeys/options", headers={"X-CSRF-Token": t})
+        assert r.status_code == 400 and "aren't available" in r.json()["error"], r.text
+        assert 'id="passkeys"' not in c.get("/account").text
+        print("✓ SSO accounts can't register passkeys")
     print("AUTH ALL GOOD")
 
 

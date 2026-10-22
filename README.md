@@ -8,6 +8,7 @@ A self-hosted, web-based inventory and accounting application for eBay resellers
 
 <img width="1906" height="714" alt="image" src="https://github.com/user-attachments/assets/b0378289-c277-47d4-bdb2-32a730f1598f" />
 
+
 ## What it does
 
 | Area | Features |
@@ -24,7 +25,7 @@ A self-hosted, web-based inventory and accounting application for eBay resellers
 | **Books** | Expense ledger by Schedule C category (with receipts), mileage log at the IRS rate (2026: 72.5¢), income statement by marketplace, tax report (accrual/inventory or cash) with guided data checks and CSV export. |
 | **Data** | CSV import/export, full JSON export/restore (also migrates SQLite ⇄ PostgreSQL/MySQL), nightly backups. |
 | **Installable app** | Progressive Web App: install it from the browser on Android, iPhone/iPad or desktop for a full-screen app with its own icon, home-screen shortcuts (Add item, Record a sale) and an offline notice. Phone-friendly layout with a slide-out menu. |
-| **Security** | Local accounts with TOTP two-factor (Google Authenticator, Authy, 1Password…) and single-use recovery codes, an admin switch to require MFA for everyone, OpenID Connect single sign-on with automatic user creation and group-based access/admin rules, admin vs. regular users, brute-force throttling, sign-out-everywhere. |
+| **Security** | Passkeys (Face ID, Touch ID, Windows Hello, Android, security keys) for passwordless sign-in or as a second factor; local accounts with TOTP two-factor (Google Authenticator, Authy, 1Password…) and single-use recovery codes, an admin switch to require MFA for everyone, OpenID Connect single sign-on with automatic user creation and group-based access/admin rules, admin vs. regular users, brute-force throttling, sign-out-everywhere. |
 
 ## Where data lives
 
@@ -90,7 +91,14 @@ Long-press the installed icon for shortcuts to **Add item** and **Record a sale*
 
 **Two-factor (TOTP).** Each user turns it on under **My account → Set up authenticator**: scan the QR code, enter a code, save the 10 recovery codes. Codes can't be reused (replay protection) and wrong guesses are rate-limited. Admins can reset a user's two-factor from **Settings → Users**.
 
-**Require MFA.** **Settings → Security & MFA → Require two-factor authentication** (or `MFA_REQUIRED=true`). Anyone without an authenticator is sent straight to setup after signing in and can't use the app until they finish. By default SSO users are exempt because your identity provider is expected to enforce MFA; turn on *Also require FlipDesk TOTP for SSO users* if it doesn't.
+**Passkeys.** Local accounts can add passkeys under **My account → Passkeys** (Face ID / Touch ID, Windows Hello, Android, iCloud Keychain, Google Password Manager, 1Password, Bitwarden or a hardware security key). Then:
+- **Sign in with just a passkey**: the *Sign in with a passkey* button, or pick it from the username field's autofill suggestions. Because a passkey needs your device *and* its PIN/biometric, no extra code is asked for.
+- **Or use it as your second step** after a password, instead of an authenticator code.
+- Adding your first passkey gives you recovery codes, same as the authenticator app.
+
+Passkeys are tied to the site's address, so they need **HTTPS** and a correct **Public URL** (`PUBLIC_URL`). If you change the domain, existing passkeys stop working and users add new ones. SSO users don't get passkeys in FlipDesk; their identity provider handles that. Admins can turn passkeys off (**Settings → Security & MFA**) or remove a user's passkeys from **Settings → Users**; there's also `python -m app.cli reset-passkeys <username>`.
+
+**Require MFA.** **Settings → Security & MFA → Require two-factor authentication** (or `MFA_REQUIRED=true`). Anyone without an authenticator app or passkey is sent straight to setup after signing in and can't use the app until they finish. By default SSO users are exempt because your identity provider is expected to enforce MFA; turn on *Also require FlipDesk TOTP for SSO users* if it doesn't.
 
 **Single sign-on (OIDC).** Works with Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Entra ID, Google, Okta and others.
 1. In your IdP, create an OpenID Connect web app with redirect URI `PUBLIC_URL/auth/oidc/callback` (shown with a copy button in **Settings → Single sign-on**), authorization-code flow, scopes `openid email profile` (+ `groups`).
@@ -107,7 +115,8 @@ Security details: PKCE (S256), `state` and `nonce` checks, ID-token signature ve
 
 ```bash
 docker exec -it flipdesk python -m app.cli list-users
-docker exec -it flipdesk python -m app.cli reset-mfa admin
+docker exec -it flipdesk python -m app.cli reset-mfa admin            # authenticator app
+docker exec -it flipdesk python -m app.cli reset-passkeys admin
 docker exec -it flipdesk python -m app.cli reset-password admin        # prompts, or generates one
 docker exec -it flipdesk python -m app.cli set mfa_required false
 docker exec -it flipdesk python -m app.cli set oidc_disable_password_login false
@@ -133,8 +142,10 @@ Settings changed this way apply within ~15 seconds; no restart needed. Environme
 | `AUTH_MODE` | `local` | `none` only behind an authenticating proxy |
 | `SESSION_COOKIE_SECURE` | `false` | `true` when served only over HTTPS |
 | `PORT` | `8080` | |
+
 | `MFA_REQUIRED` | `false` | require TOTP for everyone |
 | `MFA_REQUIRED_FOR_OIDC` | `false` | also require FlipDesk TOTP for SSO users |
+| `PASSKEYS_ENABLED` | `true` | allow passkeys for local accounts |
 | `OIDC_ENABLED` `OIDC_ISSUER` `OIDC_CLIENT_ID` `OIDC_CLIENT_SECRET` | — | single sign-on |
 | `OIDC_DISPLAY_NAME` `OIDC_SCOPES` `OIDC_USERNAME_CLAIM` `OIDC_GROUPS_CLAIM` | `SSO` … | |
 | `OIDC_AUTO_CREATE` `OIDC_ALLOWED_GROUPS` `OIDC_ADMIN_GROUPS` `OIDC_NEW_USERS_ADMIN` | `true` / — | provisioning rules |
@@ -162,4 +173,5 @@ pip install -r requirements.txt
 DATA_DIR=./data CONFIG_DIR=./config uvicorn app.main:app --reload --port 8080
 python tests/test_app.py   # end-to-end test with a mocked eBay API
 python tests/test_auth.py  # TOTP, MFA enforcement, roles and OIDC against a local fake identity provider
+python tests/test_passkeys_browser.py  # passkeys in Chromium with a virtual authenticator (needs Playwright)
 ```

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .. import config, settings
 from ..db import get_db
 from ..models import AutomationLog, JobRun, Listing, Notification, User
-from ..services import authn, automations, issues, notify, oidc, scheduler
+from ..services import authn, automations, issues, notify, oidc, passkeys, scheduler
 from ..util import hash_password, utcnow
 from ..web import current_user_obj, form, redirect, render
 
@@ -147,6 +147,10 @@ async def user_action(uid: int, action: str, request: Request, db: Session = Dep
         authn.disable_totp(db, u)
         authn.sign_out_everywhere(u)
         msg = f"Two-factor reset for {u.username}." + (" They'll set up a new authenticator at next sign-in." if settings.get("MFA_REQUIRED") else "")
+    elif action == "reset-passkeys":
+        n = passkeys.remove_all(db, u)
+        authn.sign_out_everywhere(u)
+        msg = f"Removed {n} passkey(s) from {u.username}."
     elif action == "set-password":
         pw = f.get("password") or ""
         if len(pw) < 8:
@@ -166,7 +170,7 @@ async def user_action(uid: int, action: str, request: Request, db: Session = Dep
     else:
         raise HTTPException(404)
     db.commit()
-    if self_ and action in ("sign-out", "reset-mfa", "set-password"):
+    if self_ and action in ("sign-out", "reset-mfa", "set-password", "reset-passkeys"):
         request.session.clear()
         return redirect("/login?local=1", request, msg)
     return redirect("/settings?tab=users", request, msg)

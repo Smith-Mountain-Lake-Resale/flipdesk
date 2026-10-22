@@ -4,8 +4,17 @@
 <div class="login">
   <div class="brand" style="color:var(--ink);padding:0 0 16px"><span class="dot">⇄</span>{{ APP_NAME }}</div>
   <div class="card">
-    <h2>{{ 'Use a recovery code' if recovery else 'Enter your authenticator code' }}</h2>
+    <h2>{{ 'Use a recovery code' if recovery else ('Enter your authenticator code' if has_totp else 'Confirm it\'s you') }}</h2>
     {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+    {% if has_passkey and not recovery %}
+      <div class="js-pk" hidden>
+        <button type="button" class="btn primary" style="width:100%;justify-content:center" data-passkey-login="mfa">🔑 Use your passkey</button>
+        <div class="flash err js-pk-error" hidden style="margin-top:10px"></div>
+        {% if has_totp %}<div class="muted small" style="text-align:center;margin:12px 0 4px">or enter a code from your authenticator app</div>{% endif %}
+      </div>
+      <p class="small muted js-pk-unsupported" hidden>This browser can't use passkeys here (passkeys need HTTPS). {{ 'Use your authenticator app or a recovery code.' if has_totp else 'Use a recovery code.' }}</p>
+    {% endif %}
+    {% if recovery or has_totp %}
     <form method="post" action="/login/mfa">{{ csrf_input() }}
       <input type="hidden" name="mode" value="{{ 'recovery' if recovery else 'totp' }}">
       {% if recovery %}
@@ -15,10 +24,11 @@
         <p class="sub">Open your authenticator app (Google Authenticator, Authy, 1Password, Bitwarden…) and enter the 6-digit code for {{ APP_NAME }}.</p>
         <div class="field"><label>6-digit code</label><input type="text" name="code" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" autofocus autocomplete="one-time-code" class="mono" style="font-size:22px;letter-spacing:.2em;text-align:center"></div>
       {% endif %}
-      <button class="btn primary" style="width:100%;justify-content:center">Verify</button>
+      <button class="btn {{ '' if has_passkey and not recovery else 'primary' }}" style="width:100%;justify-content:center">Verify</button>
     </form>
+    {% endif %}
     <p class="small" style="margin-top:12px;text-align:center">
-      {% if recovery %}<a href="/login/mfa">Use my authenticator app instead</a>{% else %}<a href="/login/mfa?recovery=1">Lost your device? Use a recovery code</a>{% endif %}
+      {% if recovery %}<a href="/login/mfa">{{ 'Use my authenticator app or passkey instead' if has_totp and has_passkey else ('Use my passkey instead' if has_passkey else 'Use my authenticator app instead') }}</a>{% else %}<a href="/login/mfa?recovery=1">Lost your device? Use a recovery code</a>{% endif %}
       · <a href="/logout">Cancel</a></p>
   </div>
 </div>

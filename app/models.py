@@ -30,10 +30,33 @@ class User(Base):
     recovery_codes: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON list of sha256 hashes
     session_epoch: Mapped[int] = mapped_column(Integer, default=0)  # bump to sign out everywhere
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    webauthn_user_id: Mapped[str | None] = mapped_column(String(100), nullable=True)  # random handle, not the DB id
+    passkey_count: Mapped[int] = mapped_column(Integer, default=0)  # cached; checked on every request
+
+    @property
+    def has_second_factor(self) -> bool:
+        return bool(self.totp_enabled) or (self.passkey_count or 0) > 0
 
     @property
     def has_password(self) -> bool:
         return bool(self.password_hash) and self.password_hash != "!"
+
+
+class Passkey(Base):
+    """A WebAuthn credential (passkey) registered to a local account."""
+    __tablename__ = "passkeys"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    credential_id: Mapped[str] = mapped_column(String(512), unique=True)  # base64url
+    public_key: Mapped[str] = mapped_column(Text)                          # base64url COSE key
+    sign_count: Mapped[int] = mapped_column(Integer, default=0)
+    transports: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    aaguid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    backed_up: Mapped[bool] = mapped_column(Boolean, default=False)       # synced passkey (iCloud, Google…)
+    device_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    name: Mapped[str] = mapped_column(String(100), default="Passkey")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Setting(Base):

@@ -75,3 +75,83 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localho
     }
   });
 })();
+
+// ---------- Passkeys (WebAuthn) ----------
+window.Passkeys = (() => {
+  const enc = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const dec = (s) => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer; };
+  const supported = () => !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+  const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
+  async function post(url, body) {
+    const r = await fetch(url, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf() }, body: JSON.stringify(body || {}) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('Request failed (' + r.status + ')'));
+    return j;
+  }
+  const toCreate = (o) => { o.challenge = dec(o.challenge); o.user.id = dec(o.user.id); (o.excludeCredentials || []).forEach((c) => { c.id = dec(c.id); }); return o; };
+  const toGet = (o) => { o.challenge = dec(o.challenge); (o.allowCredentials || []).forEach((c) => { c.id = dec(c.id); }); return o; };
+  function serialize(c) {
+    const r = c.response;
+    const out = { id: c.id, rawId: enc(c.rawId), type: c.type, authenticatorAttachment: c.authenticatorAttachment || null,
+      clientExtensionResults: c.getClientExtensionResults ? c.getClientExtensionResults() : {}, response: { clientDataJSON: enc(r.clientDataJSON) } };
+    if (r.attestationObject) { out.response.attestationObject = enc(r.attestationObject); out.response.transports = r.getTransports ? r.getTransports() : []; }
+    if (r.authenticatorData) { out.response.authenticatorData = enc(r.authenticatorData); out.response.signature = enc(r.signature); out.response.userHandle = r.userHandle ? enc(r.userHandle) : null; }
+    return out;
+  }
+  function friendly(err) {
+    if (!err) return 'Something went wrong.';
+    if (err.name === 'NotAllowedError') return 'Passkey request was cancelled or timed out.';
+    if (err.name === 'InvalidStateError') return 'This device already has a passkey for your account.';
+    if (err.name === 'SecurityError') return 'Passkeys need this site opened at its HTTPS address (check Public URL).';
+    return err.message || String(err);
+  }
+  let ac = null;
+  async function signIn({ step = false, next = '/', conditional = false } = {}) {
+    if (ac) ac.abort('restart');
+    ac = new AbortController();
+    const opts = await post('/auth/passkey/options' + (step ? '?step=mfa' : ''));
+    const cred = await navigator.credentials.get({ publicKey: toGet(opts), signal: ac.signal, ...(conditional ? { mediation: 'conditional' } : {}) });
+    return post('/auth/passkey/verify', { credential: serialize(cred), next });
+  }
+  async function register(name) {
+    const opts = await post('/account/passkeys/options');
+    const cred = await navigator.credentials.create({ publicKey: toCreate(opts) });
+    return post('/account/passkeys/register', { credential: serialize(cred), name });
+  }
+  return { supported, signIn, register, friendly };
+})();
+
+document.addEventListener('DOMContentLoaded', () => {
+  const ok = Passkeys.supported();
+  document.querySelectorAll('.js-pk').forEach((el) => { el.hidden = !ok; });
+  document.querySelectorAll('.js-pk-unsupported').forEach((el) => { el.hidden = ok; });
+  if (!ok) return;
+  const showErr = (msg) => { const e = document.querySelector('.js-pk-error'); if (e) { e.textContent = msg; e.hidden = !msg; } };
+  const go = (res) => { if (res && res.redirect) location.href = res.redirect; };
+
+  document.querySelectorAll('[data-passkey-login]').forEach((btn) => btn.addEventListener('click', async () => {
+    showErr(''); btn.disabled = true;
+    try { go(await Passkeys.signIn({ next: btn.dataset.next || '/', step: btn.dataset.passkeyLogin === 'mfa' })); }
+    catch (e) { if (e.name !== 'AbortError') showErr(Passkeys.friendly(e)); }
+    finally { btn.disabled = false; }
+  }));
+
+  // Autofill: offer passkeys in the username field's suggestions (Chrome, Safari, Edge).
+  const auto = document.querySelector('input[autocomplete~="webauthn"]');
+  if (auto && PublicKeyCredential.isConditionalMediationAvailable) {
+    PublicKeyCredential.isConditionalMediationAvailable().then((yes) => {
+      if (!yes) return;
+      Passkeys.signIn({ conditional: true, next: auto.dataset.next || '/' }).then(go)
+        .catch((e) => { if (e.name !== 'AbortError' && e !== 'restart' && e.name !== 'NotAllowedError') showErr(Passkeys.friendly(e)); });
+    });
+  }
+
+  document.querySelectorAll('[data-passkey-add]').forEach((btn) => btn.addEventListener('click', async () => {
+    showErr(''); btn.disabled = true;
+    const name = (document.querySelector('#pk_name') || {}).value || '';
+    try { go(await Passkeys.register(name)); }
+    catch (e) { showErr(Passkeys.friendly(e)); }
+    finally { btn.disabled = false; }
+  }));
+});

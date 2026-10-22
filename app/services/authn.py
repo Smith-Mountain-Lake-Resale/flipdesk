@@ -30,7 +30,7 @@ def start_session(request: Request, user: User, method: str) -> None:
     request.session["user"] = user.username
     request.session["epoch"] = user.session_epoch or 0
     request.session["method"] = method
-    request.session["mfa_ok"] = bool(user.totp_enabled)
+    request.session["mfa_ok"] = bool(user.has_second_factor) or method == "passkey"
     request.session["csrf"] = secrets.token_urlsafe(24)  # rotate on privilege change
 
 
@@ -58,7 +58,10 @@ def finish_login(request: Request, db: Session, user: User, method: str) -> None
 
 
 def mfa_needed_for(user: User, method: str) -> bool:
-    if not user.totp_enabled:
+    """Does this sign-in need a second step (authenticator code, passkey or recovery code)?"""
+    if method == "passkey":
+        return False  # a passkey with user verification is already two factors
+    if not user.has_second_factor:
         return False
     if method == "oidc" and not settings.get("MFA_REQUIRED_FOR_OIDC"):
         return False  # IdP handles MFA
@@ -66,8 +69,8 @@ def mfa_needed_for(user: User, method: str) -> bool:
 
 
 def must_enroll(user: User, method: str) -> bool:
-    """Is this user blocked until they set up TOTP?"""
-    if user.totp_enabled or not settings.get("MFA_REQUIRED"):
+    """Is this user blocked until they set up a second factor (TOTP or passkey)?"""
+    if method == "passkey" or user.has_second_factor or not settings.get("MFA_REQUIRED"):
         return False
     if method == "oidc" and not settings.get("MFA_REQUIRED_FOR_OIDC"):
         return False
@@ -130,7 +133,7 @@ def enable_totp(db: Session, user: User, secret: str, counter: int) -> list[str]
     user.totp_enabled = True
     user.totp_enabled_at = utcnow()
     user.totp_last_counter = counter
-    codes = new_recovery_codes(user)
+    codes = new_recovery_codes(user)  # (replaces any codes issued with a passkey)
     db.commit()
     return codes
 
@@ -140,7 +143,8 @@ def disable_totp(db: Session, user: User) -> None:
     user.totp_enabled = False
     user.totp_enabled_at = None
     user.totp_last_counter = 0
-    user.recovery_codes = None
+    if not (user.passkey_count or 0):
+        user.recovery_codes = None  # keep them while passkeys still count as a second factor
     db.commit()
 
 
@@ -211,6 +215,7 @@ class Throttle:
 login_throttle = Throttle(limit=10, window=15 * 60)   # per IP + username
 ip_throttle = Throttle(limit=50, window=15 * 60)      # per IP (password spraying)
 mfa_throttle = Throttle(limit=5, window=5 * 60)       # per user
+passkey_throttle = Throttle(limit=20, window=5 * 60)  # per IP, failed passkey assertions
 
 
 def client_ip(request: Request) -> str:

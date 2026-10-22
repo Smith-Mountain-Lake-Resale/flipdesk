@@ -2,15 +2,16 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .. import settings
 from ..db import get_db
-from ..models import User
-from ..services import authn
+from ..models import Passkey, User
+from ..services import authn, passkeys
 from ..util import hash_password, verify_password
-from ..web import current_user_obj, form, redirect, render
+from ..web import current_user_obj, flash, form, redirect, render
 
 router = APIRouter()
 
@@ -20,11 +21,12 @@ def _me(request: Request, db: Session) -> User | None:
     return db.get(User, u.id) if u else None
 
 
-def _ctx(request: Request, me: User) -> dict:
+def _ctx(request: Request, me: User, db: Session) -> dict:
     method = request.session.get("method", "password")
     return {"u": me, "left": authn.recovery_codes_left(me), "required": settings.get("MFA_REQUIRED"),
             "must_enroll": authn.must_enroll(me, method), "method": method,
-            "oidc_trusted": not settings.get("MFA_REQUIRED_FOR_OIDC")}
+            "oidc_trusted": not settings.get("MFA_REQUIRED_FOR_OIDC"),
+            "passkeys_ok": passkeys.allowed_for(me), "passkeys": passkeys.list_for(db, me)}
 
 
 @router.get("/account")
@@ -32,7 +34,7 @@ def account(request: Request, db: Session = Depends(get_db)):
     me = _me(request, db)
     if me is None:
         return redirect("/settings")  # AUTH_MODE=none
-    return render(request, "account.html", _ctx(request, me))
+    return render(request, "account.html", _ctx(request, me, db))
 
 
 @router.post("/account/profile")
@@ -88,7 +90,7 @@ def mfa_setup(request: Request, db: Session = Depends(get_db)):
         secret = authn.new_secret()
         request.session["pending_totp_secret"] = secret
     uri = authn.provisioning_uri(me, secret)
-    return render(request, "mfa_setup.html", {**_ctx(request, me), "secret": secret, "uri": uri,
+    return render(request, "mfa_setup.html", {**_ctx(request, me, db), "secret": secret, "uri": uri,
                                               "qr": authn.qr_svg(uri)})
 
 
@@ -122,17 +124,96 @@ async def mfa_disable(request: Request, db: Session = Depends(get_db)):
     if not (authn.verify_totp(db, me, code) or authn.use_recovery_code(db, me, code)):
         return redirect("/account", request, "Enter a current authenticator code (or a recovery code) to confirm.", "err")
     authn.disable_totp(db, me)
-    if settings.get("MFA_REQUIRED"):
+    if settings.get("MFA_REQUIRED") and not me.has_second_factor:
         return redirect("/account/mfa?required=1", request, "Authenticator removed. Two-factor is required here, so set up your new one now.")
     return redirect("/account", request, "Two-factor authentication turned off.")
 
 
 @router.post("/account/mfa/recovery")
 async def mfa_recovery(request: Request, db: Session = Depends(get_db)):
+    """New recovery codes. Confirm with an authenticator code, or (passkey-only accounts) the password."""
     f = await form(request)
     me = _me(request, db)
-    if not me.totp_enabled or not authn.verify_totp(db, me, f.get("code") or ""):
-        return redirect("/account", request, "Enter a current authenticator code to generate new recovery codes.", "err")
+    if not me.has_second_factor:
+        return redirect("/account")
+    ok = False
+    if me.totp_enabled:
+        ok = authn.verify_totp(db, me, f.get("code") or "")
+    elif me.has_password:
+        ok = verify_password(f.get("password") or "", me.password_hash)
+    else:
+        ok = request.session.get("method") == "passkey"  # signed in with a passkey just now
+    if not ok:
+        return redirect("/account", request, "Confirm with a current authenticator code (or your password) to generate new recovery codes.", "err")
     codes = authn.new_recovery_codes(me)
     db.commit()
     return render(request, "recovery_codes.html", {"codes": codes, "fresh": False})
+
+
+# ------------------------------------------------------------------ passkeys
+def _json_csrf(request: Request) -> bool:
+    tok = request.headers.get("x-csrf-token")
+    return bool(tok) and tok == request.session.get("csrf")
+
+
+@router.post("/account/passkeys/options")
+async def passkey_reg_options(request: Request, db: Session = Depends(get_db)):
+    if not _json_csrf(request):
+        return JSONResponse({"error": "Page expired — refresh and try again."}, 400)
+    me = _me(request, db)
+    try:
+        return Response(passkeys.registration_options(request, db, me), media_type="application/json")
+    except passkeys.PasskeyError as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+
+
+@router.post("/account/passkeys/register")
+async def passkey_register(request: Request, db: Session = Depends(get_db)):
+    if not _json_csrf(request):
+        return JSONResponse({"error": "Page expired — refresh and try again."}, 400)
+    me = _me(request, db)
+    try:
+        body = passkeys.parse_body(await request.body())
+        pk, codes = passkeys.register(request, db, me, body.get("credential") or {}, body.get("name") or "")
+    except passkeys.PasskeyError as exc:
+        return JSONResponse({"error": str(exc)}, 400)
+    if codes:
+        request.session["show_codes"] = codes  # shown once on the next page
+        return JSONResponse({"redirect": "/account/recovery-codes"})
+    flash(request, f"Passkey “{pk.name}” added.")
+    return JSONResponse({"redirect": "/account#passkeys"})
+
+
+@router.get("/account/recovery-codes")
+def show_new_codes(request: Request):
+    codes = request.session.pop("show_codes", None)
+    if not codes:
+        return redirect("/account")
+    return render(request, "recovery_codes.html", {"codes": codes, "fresh": True, "passkey": True})
+
+
+@router.post("/account/passkeys/{pk_id}/rename")
+async def passkey_rename(pk_id: int, request: Request, db: Session = Depends(get_db)):
+    f = await form(request)
+    me = _me(request, db)
+    pk = db.query(Passkey).filter_by(id=pk_id, user_id=me.id).first()
+    if pk and (f.get("name") or "").strip():
+        pk.name = f.get("name").strip()[:100]
+        db.commit()
+    return redirect("/account#passkeys", request, "Passkey renamed.")
+
+
+@router.post("/account/passkeys/{pk_id}/delete")
+async def passkey_delete(pk_id: int, request: Request, db: Session = Depends(get_db)):
+    await form(request)
+    me = _me(request, db)
+    last_factor = (me.passkey_count or 0) <= 1 and not me.totp_enabled
+    if last_factor and settings.get("MFA_REQUIRED") and request.session.get("method") != "oidc":
+        return redirect("/account#passkeys", request, "Two-factor is required here — add another passkey or an authenticator app before removing your last passkey.", "err")
+    if last_factor and not me.has_password and not me.oidc_sub:
+        return redirect("/account#passkeys", request, "This is your only way to sign in. Set a password first.", "err")
+    try:
+        passkeys.delete(db, me, pk_id)
+    except passkeys.PasskeyError as exc:
+        return redirect("/account#passkeys", request, str(exc), "err")
+    return redirect("/account#passkeys", request, "Passkey removed.")
