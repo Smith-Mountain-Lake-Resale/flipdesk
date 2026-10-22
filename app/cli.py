@@ -2,6 +2,7 @@
 
     docker exec -it flipdesk python -m app.cli list-users
     docker exec -it flipdesk python -m app.cli reset-mfa <username>
+    docker exec -it flipdesk python -m app.cli reset-passkeys <username>
     docker exec -it flipdesk python -m app.cli reset-password <username> [new-password]
     docker exec -it flipdesk python -m app.cli make-admin <username>
     docker exec -it flipdesk python -m app.cli enable <username>
@@ -51,7 +52,7 @@ def main(argv: list[str]) -> None:
         if cmd == "list-users":
             for u in db.query(User).order_by(User.id):
                 print(f"{u.id:>3}  {u.username:<24} {'admin' if u.is_admin else 'user ':<5}  "
-                      f"{'disabled' if u.is_active is False else 'active  '}  mfa={'on ' if u.totp_enabled else 'off'}  "
+                      f"{'disabled' if u.is_active is False else 'active  '}  totp={'on ' if u.totp_enabled else 'off'}  passkeys={u.passkey_count or 0}  "
                       f"{'sso' if u.oidc_sub else ''}{' password' if u.has_password else ''}  {u.email or ''}")
         elif cmd == "reset-mfa":
             u = _user(db, argv[1])
@@ -59,6 +60,13 @@ def main(argv: list[str]) -> None:
             authn.sign_out_everywhere(u)
             db.commit()
             print(f"Two-factor removed for {u.username}.")
+        elif cmd == "reset-passkeys":
+            from .services import passkeys
+            u = _user(db, argv[1])
+            n = passkeys.remove_all(db, u)
+            authn.sign_out_everywhere(u)
+            db.commit()
+            print(f"Removed {n} passkey(s) from {u.username}.")
         elif cmd == "reset-password":
             u = _user(db, argv[1])
             u.password_hash = hash_password(_password(argv, 2))

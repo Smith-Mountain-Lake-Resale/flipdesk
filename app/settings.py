@@ -62,8 +62,9 @@ REGISTRY: dict[str, tuple] = {
     "SMTP_TO": ("", "str", False, "alerts", "Send alerts to", ""),
     "SMTP_STARTTLS": ("true", "bool", False, "alerts", "Use STARTTLS", ""),
     # ---- authentication: MFA
-    "MFA_REQUIRED": ("false", "bool", False, "auth", "Require two-factor authentication (TOTP) for everyone", "Users without an authenticator are sent to set one up right after signing in, and can't use the app until they do."),
+    "MFA_REQUIRED": ("false", "bool", False, "auth", "Require two-factor authentication (TOTP) for everyone", "Users without an authenticator app or passkey are sent to set one up right after signing in, and can't use the app until they do."),
     "MFA_REQUIRED_FOR_OIDC": ("false", "bool", False, "auth", "Also require FlipDesk TOTP for SSO (OIDC) users", "Off = trust your identity provider's MFA. Turn on if your IdP doesn't enforce MFA."),
+    "PASSKEYS_ENABLED": ("true", "bool", False, "auth", "Allow passkeys for local accounts", "Sign in with Face ID, Touch ID, Windows Hello, Android or a security key. A passkey also counts as two-factor. Requires HTTPS (or localhost) and a correct Public URL."),
     "MFA_ISSUER_NAME": ("FlipDesk", "str", False, "auth", "Name shown in authenticator apps", ""),
     # ---- authentication: OIDC
     "OIDC_ENABLED": ("false", "bool", False, "oidc", "Enable OpenID Connect (SSO) sign-in", "Works with Authentik, Authelia, Keycloak, Pocket ID, Zitadel, Microsoft Entra ID, Google, Okta…"),
