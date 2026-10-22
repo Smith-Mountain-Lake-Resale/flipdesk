@@ -1,32 +1,33 @@
-# FlipDesk with the built-in SQLite database (simplest).
-# All data lives in ./data and ./config on the host — back those up and you have everything.
-services:
-  flipdesk:
-    build: .
-    image: flipdesk:latest
-    container_name: flipdesk
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      TZ: America/New_York
-      PUID: 1000              # owner of files written to ./data and ./config
-      PGID: 1000
-      PUBLIC_URL: https://flip.example.com   # the HTTPS address eBay will redirect to
-      # DB_TYPE: sqlite       # default; the database file is /data/flipdesk.db
-      # Optional: set eBay keys here instead of in the web UI (they become read-only in the UI)
-      # EBAY_CLIENT_ID: YourName-FlipDesk-PRD-xxxxxxxx-xxxxxxxx
-      # EBAY_CLIENT_SECRET: PRD-xxxxxxxxxxxx-xxxx-xxxx-xxxx-xxxx
-      # EBAY_RUNAME: Your_Name-YourName-FlipDe-xxxxxxxx
-      # SESSION_COOKIE_SECURE: "true"   # when only served over HTTPS
-      # MFA_REQUIRED: "true"
-      # Single sign-on (or configure in Settings → Single sign-on):
-      # OIDC_ENABLED: "true"
-      # OIDC_DISPLAY_NAME: Authentik
-      # OIDC_ISSUER: https://auth.example.com/application/o/flipdesk/
-      # OIDC_CLIENT_ID: flipdesk
-      # OIDC_CLIENT_SECRET: xxxxxxxx
-      # OIDC_ADMIN_GROUPS: flipdesk-admins
-    volumes:
-      - ./data:/data          # database, photos, receipts, backups
-      - ./config:/config      # config.yml (optional) + secret.key (auto-generated, keep it!)
+# FlipDesk — self-hosted eBay reseller automation, profit tracking & bookkeeping
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DATA_DIR=/data \
+    CONFIG_DIR=/config \
+    PORT=8080 \
+    PUID=1000 \
+    PGID=1000 \
+    TZ=UTC
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tzdata \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY app ./app
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && mkdir -p /data /config
+
+# Everything stateful lives in these two host-mapped directories.
+VOLUME ["/data", "/config"]
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"PORT\",\"8080\")}/health', timeout=4)" || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]
