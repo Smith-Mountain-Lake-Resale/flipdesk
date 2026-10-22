@@ -2,7 +2,16 @@
 {% block title %}Set up two-factor{% endblock %}
 {% block content %}
 <div class="topbar"><div><h1>Set up two-factor authentication</h1><div class="sub">Takes about a minute.</div></div>{% if not must_enroll %}<a class="btn" href="/account">Cancel</a>{% endif %}</div>
-{% if must_enroll %}<div class="note warn"><b>Your administrator requires two-factor authentication.</b> Set up an authenticator to continue using {{ APP_NAME }}. <a href="/logout">Sign out</a></div>{% endif %}
+{% if must_enroll %}<div class="note warn"><b>Your administrator requires two-factor authentication.</b> Add a passkey or set up an authenticator app to continue using {{ APP_NAME }}. <a href="/logout">Sign out</a></div>{% endif %}
+{% if passkeys_ok %}
+<div class="card js-pk" hidden style="max-width:760px">
+  <h3>Easiest: add a passkey</h3>
+  <p class="sub">Use Face ID, Touch ID, Windows Hello, your phone or a security key. Next time you can sign in with just the passkey.</p>
+  <div class="row"><input type="text" id="pk_name" placeholder="Name (optional)" style="flex:1;min-width:160px" maxlength="100"><button type="button" class="btn primary" data-passkey-add>🔑 Add a passkey</button></div>
+  <div class="flash err js-pk-error" hidden style="margin-top:10px"></div>
+</div>
+<h3 style="max-width:760px">Or use an authenticator app</h3>
+{% endif %}
 <div class="card" style="max-width:760px">
   <div class="grid g2" style="align-items:start">
     <div>

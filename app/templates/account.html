@@ -1,29 +1,65 @@
 {% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
 {% block title %}My account{% endblock %}
 {% block content %}
-<div class="topbar"><div><h1>My account</h1><div class="sub">{{ u.username }}{% if u.is_admin %} · admin{% endif %} · signed in with {{ 'single sign-on' if method == 'oidc' else 'password' }}{% if u.last_login %} · last sign-in {{ u.last_login|dt('%Y-%m-%d %H:%M') }} UTC{% endif %}</div></div></div>
+<div class="topbar"><div><h1>My account</h1><div class="sub">{{ u.username }}{% if u.is_admin %} · admin{% endif %} · signed in with {{ {'oidc': 'single sign-on', 'passkey': 'a passkey'}.get(method, 'password') }}{% if u.last_login %} · last sign-in {{ u.last_login|dt('%Y-%m-%d %H:%M') }} UTC{% endif %}</div></div></div>
 <div class="grid g2">
   <div>
+    {% if passkeys_ok %}
+    <div class="card" id="passkeys">
+      <h2>Passkeys</h2>
+      <p class="sub">Sign in with Face ID, Touch ID, Windows Hello, your Android phone or a security key — no password or code needed. A passkey also counts as your second factor.</p>
+      {% if passkeys %}
+      <table style="margin-bottom:10px">
+        {% for pk in passkeys %}
+        <tr>
+          <td><b>{{ pk.name }}</b>{% if pk.backed_up %} <span class="pill info" title="Synced across your devices (iCloud Keychain, Google Password Manager, 1Password…)">synced</span>{% endif %}
+            <div class="small muted">Added {{ pk.created_at|dt }} · {{ 'last used ' ~ (pk.last_used_at|dt) if pk.last_used_at else 'not used yet' }}</div></td>
+          <td class="r nowrap">
+            <details style="display:inline-block"><summary class="small">Rename</summary>
+              <form method="post" action="/account/passkeys/{{ pk.id }}/rename" class="row" style="gap:4px;margin-top:4px">{{ csrf_input() }}<input type="text" name="name" value="{{ pk.name }}" style="width:150px"><button class="btn sm">Save</button></form>
+            </details>
+            <form method="post" action="/account/passkeys/{{ pk.id }}/delete" class="inline" data-confirm="Remove “{{ pk.name }}”? You won't be able to sign in with it any more.">{{ csrf_input() }}<button class="btn sm danger">Remove</button></form>
+          </td>
+        </tr>{% endfor %}
+      </table>
+      {% endif %}
+      <div class="js-pk" hidden>
+        <div class="row">
+          <input type="text" id="pk_name" placeholder="Name (e.g. Jason's iPhone)" style="flex:1;min-width:160px" maxlength="100">
+          <button type="button" class="btn {{ '' if passkeys else 'primary' }}" data-passkey-add>🔑 Add a passkey</button>
+        </div>
+      </div>
+      <div class="flash err js-pk-error" hidden style="margin-top:10px"></div>
+      <p class="small muted js-pk-unsupported" hidden>Passkeys need {{ APP_NAME }} to be opened at its HTTPS address (or localhost) in a browser that supports them.</p>
+    </div>
+    {% endif %}
     <div class="card" id="mfa">
-      <h2>Two-factor authentication</h2>
+      <h2>Authenticator app</h2>
       {% if u.totp_enabled %}
-        <p><span class="pill ok">On</span> Authenticator app added {{ u.totp_enabled_at|dt }}. {{ left }} recovery code{{ '' if left == 1 else 's' }} left.</p>
-        {% if left <= 3 %}<div class="note warn">You're running low on recovery codes — generate a new set.</div>{% endif %}
+        <p><span class="pill ok">On</span> Authenticator app added {{ u.totp_enabled_at|dt }}.</p>
         {% if method == 'oidc' and oidc_trusted %}<p class="small muted">When you sign in with SSO, your identity provider's MFA is used instead; this authenticator protects password sign-in.</p>{% endif %}
-        <form method="post" action="/account/mfa/recovery" class="row" style="margin-top:10px">{{ csrf_input() }}
-          <input type="text" name="code" inputmode="numeric" maxlength="7" placeholder="Current 6-digit code" style="width:180px" class="mono" autocomplete="one-time-code">
-          <button class="btn">New recovery codes</button>
-        </form>
-        <form method="post" action="/account/mfa/disable" class="row" style="margin-top:10px" data-confirm="{{ 'Remove this authenticator? You will set up a new one right away.' if required else 'Turn off two-factor authentication?' }}">{{ csrf_input() }}
+        <form method="post" action="/account/mfa/disable" class="row" style="margin-top:10px" data-confirm="{{ 'Remove this authenticator? You will set up a new one right away.' if (required and not u.passkey_count) else 'Remove your authenticator app?' }}">{{ csrf_input() }}
           <input type="text" name="code" placeholder="Code or recovery code" style="width:180px" class="mono" autocomplete="off">
-          <button class="btn danger">{{ 'Replace authenticator' if required else 'Turn off' }}</button>
+          <button class="btn danger">{{ 'Replace authenticator' if (required and not u.passkey_count) else 'Remove' }}</button>
         </form>
       {% else %}
-        <p><span class="pill {{ 'error' if required else 'unlisted' }}">Off</span> Protect your account with a 6-digit code from an authenticator app such as Google Authenticator, Microsoft Authenticator, Authy, 1Password or Bitwarden.</p>
+        <p><span class="pill {{ 'error' if (required and not u.has_second_factor) else 'unlisted' }}">Off</span> Use a 6-digit code from an app such as Google Authenticator, Microsoft Authenticator, Authy, 1Password or Bitwarden.</p>
         {% if required and method == 'oidc' and oidc_trusted %}<p class="small muted">Not required for SSO sign-in (your identity provider handles MFA), but recommended if you also use a password.</p>{% endif %}
-        <a class="btn primary" href="/account/mfa">Set up authenticator</a>
+        <a class="btn {{ '' if u.passkey_count else 'primary' }}" href="/account/mfa">Set up authenticator app</a>
       {% endif %}
     </div>
+    {% if u.has_second_factor %}
+    <div class="card">
+      <h2>Recovery codes</h2>
+      <p>{{ left }} recovery code{{ '' if left == 1 else 's' }} left. Each one signs you in once if you lose your phone or passkeys.</p>
+      {% if left <= 3 %}<div class="note warn">You're running low on recovery codes — generate a new set.</div>{% endif %}
+      <form method="post" action="/account/mfa/recovery" class="row" style="margin-top:10px">{{ csrf_input() }}
+        {% if u.totp_enabled %}<input type="text" name="code" inputmode="numeric" maxlength="7" placeholder="Current 6-digit code" style="width:180px" class="mono" autocomplete="one-time-code">
+        {% elif u.has_password %}<input type="password" name="password" placeholder="Your password" style="width:180px" autocomplete="current-password">{% endif %}
+        <button class="btn">New recovery codes</button>
+      </form>
+    </div>
+    {% endif %}
     <div class="card">
       <h2>Install the app</h2>
       <p class="sub js-install-status">Install {{ APP_NAME }} on your phone, tablet or computer so it opens in its own window from your home screen, with shortcuts for adding items and recording sales.</p>
