@@ -87,6 +87,17 @@ class EbayAccount(Base):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class Location(Base):
+    """A shelf, bin or tote with a printable QR label."""
+    __tablename__ = "locations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(20), unique=True, index=True)   # printed + encoded, e.g. L0007
+    name: Mapped[str] = mapped_column(String(255), unique=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    items: Mapped[list["Item"]] = relationship(back_populates="location")
+
+
 class BulkBuy(Base):
     __tablename__ = "bulk_buys"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -112,7 +123,8 @@ class Item(Base):
     cost: Mapped[float | None] = mapped_column(Float, nullable=True)  # total cost for `quantity`
     source: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     purchase_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    storage_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    storage_location: Mapped[str | None] = mapped_column(String(255), nullable=True)  # mirrors location.name
+    location_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id", ondelete="SET NULL"), nullable=True, index=True)
     category: Mapped[str | None] = mapped_column(String(255), nullable=True)
     brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
     condition: Mapped[str | None] = mapped_column(String(80), nullable=True)
@@ -133,6 +145,7 @@ class Item(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     bulk_buy: Mapped[BulkBuy | None] = relationship(back_populates="items")
+    location: Mapped[Location | None] = relationship(back_populates="items")
     listings: Mapped[list["Listing"]] = relationship(back_populates="item")
     sales: Mapped[list["Sale"]] = relationship(back_populates="item")
 

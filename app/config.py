@@ -22,7 +22,7 @@ from urllib.parse import quote_plus
 import yaml
 
 APP_NAME = "FlipDesk"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 CONFIG_DIR = Path(os.environ.get("CONFIG_DIR", "/config"))
