@@ -111,8 +111,8 @@ def health():
         return JSONResponse({"status": "error", "error": str(exc)}, status_code=503)
 
 
-from .routers import account, auth, locations, pwa, data, ebay_setup, inventory, ledger, reports, sales, system  # noqa: E402
+from .routers import account, auth, locations, pwa, recon, data, ebay_setup, inventory, ledger, reports, sales, system  # noqa: E402
 
-for r in (pwa.router, auth.router, account.router, locations.router, inventory.router, sales.router, ledger.router, reports.router, ebay_setup.router,
+for r in (pwa.router, auth.router, account.router, locations.router, recon.router, inventory.router, sales.router, ledger.router, reports.router, ebay_setup.router,
           system.router, data.router):
     app.include_router(r)
