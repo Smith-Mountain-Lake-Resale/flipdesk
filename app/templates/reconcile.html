@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Reconciliation sheet{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Inventory reconciliation</h1><div class="sub">Print a count sheet and walk your shelves to confirm that what's listed on eBay is really there.</div></div>
+  <a class="btn primary" href="/inventory/reconcile.pdf?{{ qs }}" target="_blank" rel="noopener">⬇ Download PDF</a>
+</div>
+<form method="get" id="recon">
+  <input type="hidden" name="submitted" value="1">
+  <div class="grid g2" style="grid-template-columns:1fr 2fr">
+    <div class="card">
+      <h2>What to count</h2>
+      {% for k, label in scopes.items() %}
+        <label class="check" style="margin-bottom:6px"><input type="radio" name="scope" value="{{ k }}" {{ 'checked' if o.scope == k }} onchange="this.form.submit()"> {{ label }}</label>
+      {% endfor %}
+      <h3 style="margin-top:14px">Locations</h3>
+      {% if locations %}
+      <div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">
+        {% for l in locations %}<label class="check" style="font-size:13px"><input type="checkbox" name="loc" value="{{ l.id }}" {{ 'checked' if l.id in o.loc }}> {{ l.name }} <span class="muted mono small">{{ l.code }}</span></label>{% endfor %}
+      </div>
+      <div class="help small muted" style="margin-top:4px">None ticked = all locations.</div>
+      {% else %}<p class="small muted">No locations yet — the sheet will list items by their location text.</p>{% endif %}
+      <label class="check" style="margin-top:8px"><input type="checkbox" name="unplaced" value="1" {{ 'checked' if o.unplaced }}> Include items with no location</label>
+      <h3 style="margin-top:14px">Layout</h3>
+      <div class="field"><label>Order</label><select name="sort">{% for k, v in sorts.items() %}<option value="{{ k }}" {{ 'selected' if o.sort == k }}>{{ v }}</option>{% endfor %}</select></div>
+      <div class="fields">
+        <div class="field"><label>Paper</label><select name="paper">{% for k, v in papers.items() %}<option value="{{ k }}" {{ 'selected' if o.paper == k }}>{{ v[0] }}</option>{% endfor %}</select></div>
+        <div class="field"><label>Orientation</label><select name="orientation"><option value="portrait" {{ 'selected' if o.orientation == 'portrait' }}>Portrait</option><option value="landscape" {{ 'selected' if o.orientation == 'landscape' }}>Landscape (wider notes)</option></select></div>
+      </div>
+      <label class="check"><input type="checkbox" name="signature" value="1" {{ 'checked' if o.signature }}> “Counted by / Checked by” lines</label>
+      <div class="row" style="margin-top:12px">
+        <button class="btn">Update preview</button>
+        <button class="btn primary" formaction="/inventory/reconcile.pdf" formtarget="_blank">⬇ Download PDF</button>
+      </div>
+    </div>
+    <div>
+      <div class="grid g4">
+        <div class="card kpi"><div class="l">Items</div><div class="v">{{ s['items'] }}</div></div>
+        <div class="card kpi"><div class="l">Units</div><div class="v">{{ s.units }}</div></div>
+        <div class="card kpi"><div class="l">Locations</div><div class="v">{{ s.locations }}</div></div>
+        <div class="card kpi"><div class="l">No location</div><div class="v {{ 'neg' if s.unplaced }}">{{ s.unplaced }}</div><div class="s">{% if s.unplaced %}<a href="/inventory?missing=location">assign shelves</a>{% else %}all placed{% endif %}</div></div>
+      </div>
+      <div class="tbl">
+        <table>
+          {% set showloc = o.sort == 'title' %}
+          <tr><th>Item</th>{% if showloc %}<th>Location</th>{% endif %}<th class="r">Expected</th><th>eBay #</th></tr>
+          {% set ns = namespace(group=None) %}
+          {% for r in rows[:300] %}
+            {% if o.sort == 'location' and (r.location or '') != ns.group %}{% set ns.group = r.location or '' %}
+              <tr><td colspan="3" style="background:var(--panel2);font-weight:700">{{ r.location or 'No location set' }}{% if r.code %} <span class="mono small muted">{{ r.code }}</span>{% endif %}</td></tr>
+            {% endif %}
+            <tr><td class="trunc"><a href="/inventory/{{ r.id }}">{{ r.title }}</a>{% if r.sku %}<div class="small muted mono">{{ r.sku }}</div>{% endif %}</td>
+              {% if showloc %}<td>{{ r.location or '—' }}</td>{% endif %}
+              <td class="r">{{ r.qty }}{% if r.ebay_qty is not none and r.ebay_qty != r.qty %} <span class="pill unlisted" title="eBay shows a different available quantity">eBay {{ r.ebay_qty }}</span>{% endif %}</td>
+              <td class="mono small">{{ r.ebay_id or '—' }}</td></tr>
+          {% else %}<tr><td colspan="{{ 4 if showloc else 3 }}" class="empty">No items match. {% if o.scope == 'listed' %}Sync your eBay listings, or choose “Everything in stock”.{% endif %}</td></tr>{% endfor %}
+        </table>
+      </div>
+      {% if rows|length > 300 %}<p class="small muted">Preview shows the first 300 of {{ rows|length }} — the PDF includes all.</p>{% endif %}
+      <p class="small muted">The PDF has a tick box, a “Counted” box and a notes column on every row, a section for items found that aren't on the list, and page numbers. Use “Expected vs eBay” flags to fix quantity mismatches after counting.</p>
+    </div>
+  </div>
+</form>
+{% endblock %}
