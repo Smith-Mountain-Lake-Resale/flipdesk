@@ -43,6 +43,7 @@ def manifest():
         "shortcuts": [
             {"name": "Add item", "short_name": "Add item", "url": "/inventory/new?source=pwa", "icons": shortcut_icon},
             {"name": "Record a sale", "short_name": "Record sale", "url": "/sales/new?source=pwa", "icons": shortcut_icon},
+            {"name": "Scan a shelf label", "short_name": "Scan shelf", "url": "/scan?source=pwa", "icons": shortcut_icon},
             {"name": "Inventory", "url": "/inventory?source=pwa", "icons": shortcut_icon},
             {"name": "Sales", "url": "/sales?source=pwa", "icons": shortcut_icon},
         ],
