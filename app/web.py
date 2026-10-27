@@ -44,10 +44,11 @@ templates.env.globals["APP_VERSION"] = config.APP_VERSION
 
 
 PUBLIC_PATHS = ("/login", "/setup", "/static/", "/health", "/ebay/account-deletion", "/privacy", "/favicon",
-                "/auth/oidc/", "/manifest.webmanifest", "/sw.js", "/offline", "/apple-touch-icon")
+                "/auth/oidc/", "/manifest.webmanifest", "/sw.js", "/offline", "/apple-touch-icon",
+                "/auth/passkey/")
 
 # Paths a signed-in user may visit while they're required to set up MFA.
-ENROLL_PATHS = ("/account/mfa", "/logout", "/static/")
+ENROLL_PATHS = ("/account/mfa", "/account/passkeys", "/logout", "/static/")
 templates.env.globals["V"] = config.APP_VERSION
 
 # Admin-only areas (configuration, data, users).
