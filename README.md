@@ -17,6 +17,7 @@ A self-hosted, web-based inventory and accounting application for eBay resellers
 | **Profit** | Per-sale net profit = price + shipping − fees − ads − label − refunds − cost of goods. Margin, ROI, avg days to list / sell. |
 | **Inventory** | Listed, unlisted (“death pile”) and sold items with cost, source, purchase date, storage location, photos. One item keeps its history across relisted item IDs (product timeline). Quick-edit grid for filling in costs fast. Auto-links when the eBay SKU matches. |
 | **Shelf labels & scanning** | Locations (shelves, bins, totes) with printable QR labels — 4, 6 or 8 per 4×6 thermal label with cut lines, one big label per 4×6, small-roll labels (4×2, 2.25×1.25, 2×1) or Letter sheets — each with the location name and code in plain text. Scan a label with the in-app camera scanner or your phone's camera to see what's on that shelf, put items away, or set an item's location. |
+| **Inventory reconciliation** | Printable count sheet (PDF) of what's listed on eBay — item, SKU/eBay #, location, expected qty, tick box, counted-qty box and notes — grouped shelf by shelf so you can confirm everything is really there. |
 | **Bulk buys** | Track a lot / storage unit as one purchase, split the cost evenly or by value, watch ROI over time. |
 | **Any marketplace** | Record Amazon, Poshmark, Mercari, Etsy, Facebook, in-person sales alongside eBay. |
 | **Automations** | End & relist GTC listings just before the 30-day auto-renew; reprice by % per relist with a max reduction and per-item floor; delayed promotion into a Promoted Listings campaign after N days unsold. Dry-run mode on by default, failed relists retried automatically. |
@@ -115,6 +116,16 @@ Each label shows the location name in large bold text plus the code (and an opti
 
 Set **Public URL** before printing so the QR links point at the address your phone uses.
 
+## Inventory reconciliation (shelf count)
+
+**Inventory → Reconciliation sheet** prints a PDF to take round your shelves and confirm that what's listed on eBay is actually there.
+
+- **What's on it:** a row per item with a tick box, the item title (plus SKU, eBay item #, price), its location and code, the expected quantity, a box for the counted quantity, and space for notes. Expected quantity is flagged when eBay shows a different available quantity.
+- **Grouped by location** (default): one block per shelf, so you can walk one shelf at a time. Items with no location are listed last so you can find and place them. A shelf that runs onto the next page repeats its heading marked "(continued)". You can switch to alphabetical order.
+- **Scope:** active eBay listings (default), everything in stock, or unlisted only. You can limit it to chosen locations, and optionally include items with no location.
+- **Paper:** Letter or A4, portrait or landscape (landscape gives wider notes). The sheet has "Counted by / Checked by" lines, a section for things found that aren't on the list, and page numbers.
+- **Single shelf:** each location page has a **🧾 Count sheet** button for just that shelf.
+
 ## Users, two-factor and single sign-on
 
 **Two-factor (TOTP).** Each user turns it on under **My account → Set up authenticator**: scan the QR code, enter a code, save the 10 recovery codes. Codes can't be reused (replay protection) and wrong guesses are rate-limited. Admins can reset a user's two-factor from **Settings → Users**.
@@ -203,4 +214,5 @@ python tests/test_app.py   # end-to-end test with a mocked eBay API
 python tests/test_auth.py  # TOTP, MFA enforcement, roles and OIDC against a local fake identity provider
 python tests/test_passkeys_browser.py  # passkeys in Chromium with a virtual authenticator (needs Playwright)
 python tests/test_locations.py   # locations, label layouts (HTML + PDF, QR decode if OpenCV + pdftoppm) and scanning
+python tests/test_recon.py       # reconciliation sheet page + PDF
 ```

@@ -27,7 +27,7 @@ h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:0 0 10px}h3{font-size:
 .topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .sub{color:var(--muted);font-size:13px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
-.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.grid{display:grid;gap:16px}.grid>*{min-width:0}select{max-width:100%}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:1fr 1fr}}
 @media(max-width:760px){.g2,.g3{grid-template-columns:1fr}.g4{grid-template-columns:1fr 1fr;gap:10px}.g4 .kpi{padding:12px}.g4 .kpi .s{font-size:11px}}
 @media(max-width:340px){.g4{grid-template-columns:1fr}}

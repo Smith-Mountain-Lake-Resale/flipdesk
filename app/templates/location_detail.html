@@ -5,6 +5,7 @@
   <div><h1>📍 {{ loc.name }}</h1><div class="sub"><span class="mono">{{ loc.code }}</span>{% if loc.description %} · {{ loc.description }}{% endif %} · {{ here|length }} item{{ 's' if here|length != 1 }} in stock · {{ value|money }} at cost</div></div>
   <div class="row">
     <a class="btn" href="/scan?mode=put">📷 Scan another</a>
+    <a class="btn" href="/inventory/reconcile.pdf?scope=stock&loc={{ loc.id }}&unplaced=0&submitted=1&signature=1" target="_blank" rel="noopener">🧾 Count sheet</a>
     <a class="btn primary" href="?put=1#put">+ Put items here</a>
   </div>
 </div>

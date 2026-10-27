@@ -19,9 +19,10 @@
 <script src="/static/app.js?v={{ V }}" defer></script>
 </head>
 <body>
-{% macro nav(href, label, match=None, badge=None, exact=False) -%}
+{% macro nav(href, label, match=None, badge=None, exact=False, exclude=None) -%}
 {%- set m = match or href -%}
-<a href="{{ href }}" class="{{ 'on' if (path == m or (not exact and m != '/' and path.startswith(m))) else '' }}"><span>{{ label }}</span>{% if badge %}<span class="badge">{{ badge }}</span>{% endif %}</a>
+{%- set on = (path == m or (not exact and m != '/' and path.startswith(m))) and not (exclude and path.startswith(exclude)) -%}
+<a href="{{ href }}" class="{{ 'on' if on else '' }}"><span>{{ label }}</span>{% if badge %}<span class="badge">{{ badge }}</span>{% endif %}</a>
 {%- endmacro %}
 {% if user and enrolling %}
 <main class="main" style="max-width:900px;margin:0 auto">{% for kind, msg in flashes %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}{{ self.content() }}</main>
@@ -40,7 +41,8 @@
     <nav>
       {{ nav('/', 'Dashboard') }}
       <div class="sec">Inventory</div>
-      {{ nav('/inventory', 'Inventory') }}
+      {{ nav('/inventory', 'Inventory', exclude='/inventory/reconcile') }}
+      {{ nav('/inventory/reconcile', 'Reconciliation sheet') }}
       {{ nav('/locations', 'Locations & labels') }}
       {{ nav('/scan', '📷 Scan shelf label') }}
       {{ nav('/listings', 'eBay listings') }}
