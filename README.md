@@ -16,6 +16,7 @@ A self-hosted, web-based inventory and accounting application for eBay resellers
 | **eBay sync** | Active listings (Trading API), orders with a 2-year backfill (Fulfillment API), fees, shipping labels, ad fees, credits and store subscriptions (Finances API). Runs on a schedule; “Sync now” buttons too. |
 | **Profit** | Per-sale net profit = price + shipping − fees − ads − label − refunds − cost of goods. Margin, ROI, avg days to list / sell. |
 | **Inventory** | Listed, unlisted (“death pile”) and sold items with cost, source, purchase date, storage location, photos. One item keeps its history across relisted item IDs (product timeline). Quick-edit grid for filling in costs fast. Auto-links when the eBay SKU matches. |
+| **Shelf labels & scanning** | Locations (shelves, bins, totes) with printable QR labels — 4, 6 or 8 per 4×6 thermal label with cut lines, one big label per 4×6, small-roll labels (4×2, 2.25×1.25, 2×1) or Letter sheets — each with the location name and code in plain text. Scan a label with the in-app camera scanner or your phone's camera to see what's on that shelf, put items away, or set an item's location. |
 | **Bulk buys** | Track a lot / storage unit as one purchase, split the cost evenly or by value, watch ROI over time. |
 | **Any marketplace** | Record Amazon, Poshmark, Mercari, Etsy, Facebook, in-person sales alongside eBay. |
 | **Automations** | End & relist GTC listings just before the 30-day auto-renew; reprice by % per relist with a max reduction and per-item floor; delayed promotion into a Promoted Listings campaign after N days unsold. Dry-run mode on by default, failed relists retried automatically. |
@@ -86,6 +87,33 @@ FlipDesk can be installed from the browser like a native app. **Browsers only al
 - **Desktop** (Chrome / Edge): the install icon at the right of the address bar, or *Install app* in the menu.
 
 Long-press the installed icon for shortcuts to **Add item** and **Record a sale**. Only static files (styles, scripts, icons) are cached on the device; pages with your financial data are always loaded live from your server, and a short “You're offline” screen appears if it can't be reached. After an upgrade, the app picks up the new version on its next launch.
+
+## Shelf locations, QR labels and scanning
+
+**Locations.** Every place you store things (shelf, bin, tote, closet) is a location with a short code like `L0007`. Create them under **Locations & labels**: one per line, and ranges such as `Tote 1-20` or `Shelf A01-A12` make one each. Locations are also created automatically when you type a new one on an item, and existing free-text locations were converted on upgrade.
+
+**Printing labels.** Tick locations → **Print selected** (or **Print all**), or use **Add & print labels**. Choose a layout:
+
+| Layout | Labels | QR size |
+|---|---|---|
+| 4×6 — 4 per label | 2″×3″ each, cut in quarters (default) | 1.75″ |
+| 4×6 — 6 per label | 2″×2″ each | 1.25″ |
+| 4×6 — 8 per label | 2″×1.5″, QR beside the text | 0.95″ |
+| 4×6 — 1 per label | one large label | 3.7″ |
+| 4″×2″, 2.25″×1.25″, 2″×1″ | one per label, for small label rolls | 0.85–1.75″ |
+| Letter sheet | 30 per page (Avery 5160-style) | 0.85″ |
+
+Each label shows the location name in large bold text plus the code (and an optional description). Multi-up labels have dashed cut lines. Use **Copies** for duplicates, and **Skip spots** to use up a partly used 4-up/6-up label or sheet. Print from the browser (paper size 4×6, margins none, scale 100%) or download the exact-size **PDF**, which is the most reliable route for thermal printers such as Rollo, Zebra, MUNBYN and Dymo 4XL. Renaming a location doesn't invalidate printed labels, because the QR holds the code.
+
+**Scanning.**
+- **📷 Scan shelf label** (sidebar, phone top bar, or long-press the app icon): live camera scanner in the browser (needs HTTPS). It also offers **Scan a photo** and typing the code by hand.
+- Your phone's **normal camera app** works too: each label is a link to `PUBLIC_URL/l/CODE`, which opens that location.
+- **See what's on a shelf:** scan → location page with everything stored there.
+- **Put items away:** on a location page, **Put items here** lists in-stock items with no location (or search), tick and move.
+- **Set an item's location:** on the item page, **📷 Scan shelf** then scan the label. (Starting it in FlipDesk and then using the phone camera app within 5 minutes also works.)
+- Every move is recorded on the item's timeline, and sale alerts tell you which shelf to pull from.
+
+Set **Public URL** before printing so the QR links point at the address your phone uses.
 
 ## Users, two-factor and single sign-on
 
@@ -174,4 +202,5 @@ DATA_DIR=./data CONFIG_DIR=./config uvicorn app.main:app --reload --port 8080
 python tests/test_app.py   # end-to-end test with a mocked eBay API
 python tests/test_auth.py  # TOTP, MFA enforcement, roles and OIDC against a local fake identity provider
 python tests/test_passkeys_browser.py  # passkeys in Chromium with a virtual authenticator (needs Playwright)
+python tests/test_locations.py   # locations, label layouts (HTML + PDF, QR decode if OpenCV + pdftoppm) and scanning
 ```

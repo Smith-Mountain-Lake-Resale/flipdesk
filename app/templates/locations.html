@@ -1,0 +1,49 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}
+{% block title %}Locations{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>Locations</h1><div class="sub">Shelves, bins and totes with QR labels. Scan a label to see what's there or to put items away.</div></div>
+  <div class="row"><a class="btn primary" href="/scan">📷 Scan a label</a></div>
+</div>
+{% if unplaced %}<div class="note">{{ unplaced }} item{{ 's' if unplaced != 1 }} in stock {{ 'have' if unplaced != 1 else 'has' }} no location. <a href="/inventory?missing=location">See them</a> or open a location and use <b>Put items here</b>.</div>{% endif %}
+<div class="grid g2" style="grid-template-columns:2fr 1fr">
+  <div>
+    <form method="get" class="filters"><input type="search" name="q" value="{{ q }}" placeholder="Search name or code" style="min-width:220px"><button class="btn">Search</button></form>
+    <form method="get" action="/locations/labels" id="printform">
+      <div class="tbl"><table>
+        <tr><th style="width:34px"><input type="checkbox" onclick="document.querySelectorAll('.pick').forEach(c=>c.checked=this.checked)" aria-label="Select all"></th><th>Location</th><th>Code</th><th class="r">Items in stock</th></tr>
+        {% for l in locs %}
+        <tr><td><input type="checkbox" class="pick" value="{{ l.id }}" aria-label="Select {{ l.name }}"></td>
+          <td><a href="/locations/{{ l.code }}">{{ l.name }}</a>{% if l.description %}<div class="small muted">{{ l.description }}</div>{% endif %}</td>
+          <td class="mono">{{ l.code }}</td><td class="r">{{ counts.get(l.id, 0) }}</td></tr>
+        {% else %}<tr><td colspan="4" class="empty">No locations yet. Add some on the right — or type a location on any item and it's created for you.</td></tr>{% endfor %}
+      </table></div>
+      <input type="hidden" name="ids" id="ids">
+      {% if locs %}
+      <div class="card" style="margin-top:12px">
+        <h2>Print QR labels</h2>
+        <div class="fields">
+          <div class="field"><label>Layout</label><select name="layout">{% for k, v in layouts.items() %}<option value="{{ k }}" {{ 'selected' if k == default_layout }}>{{ v[0] }}</option>{% endfor %}</select></div>
+          <div class="field"><label>Copies of each</label><input type="number" name="copies" min="1" max="50" value="1"></div>
+          <div class="field"><label>Skip blank spots on first label</label><input type="number" name="skip" min="0" max="29" value="0"><div class="help">Reuse a partly used 4-up/6-up label or sheet.</div></div>
+        </div>
+        <div class="row"><button class="btn primary" onclick="return pickIds()">Print selected</button>
+          <button class="btn" name="all" value="1">Print all {{ locs|length }}</button></div>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+  <div class="card">
+    <h2>Add locations</h2>
+    <form method="post" action="/locations/new">{{ csrf_input() }}
+      <div class="field"><label>Names, one per line</label><textarea name="names" rows="6" placeholder="Garage shelf A&#10;Tote 1-12&#10;Closet bin 01-05"></textarea>
+        <div class="help">Ranges like <code>Tote 1-12</code> or <code>Shelf A01-A20</code> create one location each.</div></div>
+      <div class="field"><label>Description (optional, printed small)</label><input type="text" name="description" placeholder="Garage"></div>
+      <div class="row"><button class="btn">Add</button><button class="btn primary" name="print" value="1">Add &amp; print labels</button></div>
+    </form>
+  </div>
+</div>
+<script>
+function pickIds(){const ids=[...document.querySelectorAll('.pick:checked')].map(c=>c.value);if(!ids.length){alert('Tick the locations to print first.');return false;}document.getElementById('ids').value=ids.join(',');return true;}
+</script>
+{% endblock %}

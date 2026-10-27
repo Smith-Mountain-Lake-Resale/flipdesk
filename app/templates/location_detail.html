@@ -1,0 +1,74 @@
+{% extends "base.html" %}{% from "_m.html" import csrf_input with context %}{% from "_m.html" import status_pill, item_thumb %}
+{% block title %}{{ loc.name }}{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>📍 {{ loc.name }}</h1><div class="sub"><span class="mono">{{ loc.code }}</span>{% if loc.description %} · {{ loc.description }}{% endif %} · {{ here|length }} item{{ 's' if here|length != 1 }} in stock · {{ value|money }} at cost</div></div>
+  <div class="row">
+    <a class="btn" href="/scan?mode=put">📷 Scan another</a>
+    <a class="btn primary" href="?put=1#put">+ Put items here</a>
+  </div>
+</div>
+<div class="grid g2" style="grid-template-columns:2fr 1fr">
+  <div>
+    <div class="tbl">
+      <table>
+        <tr><th></th><th>Item</th><th>Status</th><th class="r">Qty</th><th class="r">Price</th><th></th></tr>
+        {% for it in here %}{% set act = it.listings|selectattr('status','equalto','active')|list %}
+        <tr><td style="width:50px">{{ item_thumb(it) }}</td>
+          <td class="trunc"><a href="/inventory/{{ it.id }}">{{ it.title }}</a>{% if it.sku %}<div class="muted small mono">{{ it.sku }}</div>{% endif %}</td>
+          <td>{{ status_pill(it.status) }}</td><td class="r">{{ it.quantity - it.quantity_sold }}</td>
+          <td class="r">{{ (act[0].price if act else None)|money }}</td>
+          <td><form method="post" action="/locations/{{ loc.code }}/remove/{{ it.id }}" class="inline">{{ csrf_input() }}<button class="btn sm" title="Take off this shelf">✕</button></form></td></tr>
+        {% else %}<tr><td colspan="6" class="empty">Nothing here yet.</td></tr>{% endfor %}
+      </table>
+    </div>
+    {% if gone %}<details style="margin-top:10px"><summary class="small">{{ gone|length }} sold / written-off item{{ 's' if gone|length != 1 }} last stored here</summary>
+      <ul class="small">{% for it in gone %}<li><a href="/inventory/{{ it.id }}">{{ it.title }}</a> — {{ it.status|replace('_',' ') }}</li>{% endfor %}</ul></details>{% endif %}
+
+    {% if put %}
+    <div class="card" id="put" style="margin-top:16px">
+      <h2>Put items here</h2>
+      <form method="get" class="filters"><input type="hidden" name="put" value="1">
+        <input type="search" name="q" value="{{ q }}" placeholder="Search title, SKU or eBay item #" autofocus style="flex:1">
+        <button class="btn">Search</button></form>
+      {% if found %}
+      <form method="post" action="/locations/{{ loc.code }}/assign">{{ csrf_input() }}
+        <p class="small muted">{{ 'Matches' if q else 'In-stock items with no location' }} — tick what you're putting on this shelf:</p>
+        <div class="tbl" style="max-height:420px"><table>
+          {% for it in found %}
+          <tr><td style="width:34px"><input type="checkbox" name="item" value="{{ it.id }}" id="put{{ it.id }}"></td>
+            <td style="width:50px">{{ item_thumb(it) }}</td>
+            <td><label for="put{{ it.id }}" style="font-size:14px;font-weight:500;color:var(--ink);margin:0;cursor:pointer">{{ it.title }}</label>
+              <div class="small muted">{{ it.storage_location or 'no location' }}{% if it.sku %} · {{ it.sku }}{% endif %}</div></td></tr>
+          {% endfor %}
+        </table></div>
+        <button class="btn primary" style="margin-top:10px">Move ticked items to {{ loc.name }}</button>
+      </form>
+      {% else %}<p class="muted">{{ 'No matching items in stock.' if q else 'Every in-stock item already has a location. Search to move something here.' }}</p>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <div>
+    <div class="card" style="text-align:center">
+      <div style="background:#fff;display:inline-block;padding:10px;border-radius:8px" class="qrbox">{{ qr|safe }}</div>
+      <style>.qrbox svg{width:170px;height:170px;display:block}</style>
+      <div class="mono small muted" style="margin-top:6px;word-break:break-all">{{ url }}</div>
+      <form method="get" action="/locations/labels" class="row" style="justify-content:center;margin-top:10px">
+        <input type="hidden" name="ids" value="{{ loc.id }}">
+        <select name="layout" style="width:auto;max-width:100%">{% for k, v in layouts.items() %}<option value="{{ k }}" {{ 'selected' if k == '4x6-1' }}>{{ v[0] }}</option>{% endfor %}</select>
+        <button class="btn">🖨 Print label</button>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Edit</h2>
+      <form method="post" action="/locations/{{ loc.code }}/edit">{{ csrf_input() }}
+        <div class="field"><label>Name</label><input type="text" name="name" value="{{ loc.name }}"></div>
+        <div class="field"><label>Description</label><input type="text" name="description" value="{{ loc.description or '' }}"></div>
+        <button class="btn">Save</button>
+      </form>
+      <p class="small muted">Renaming doesn't break printed labels — the QR code holds <span class="mono">{{ loc.code }}</span>.</p>
+      <form method="post" action="/locations/{{ loc.code }}/delete" data-confirm="Delete {{ loc.name }}? Items stored here will have no location.">{{ csrf_input() }}<button class="btn sm danger">Delete location</button></form>
+    </div>
+  </div>
+</div>
+{% endblock %}

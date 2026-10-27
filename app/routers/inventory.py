@@ -196,8 +196,10 @@ def item_detail(iid: int, request: Request, db: Session = Depends(get_db)):
     unlinked = db.query(Listing).filter(Listing.item_id.is_(None), Listing.status == "active").order_by(Listing.title).all()
     active = [lst for lst in it.listings if lst.status == "active"]
     next_price = automations.reprice_target(it, active[0]) if active else None
+    from ..models import Location
     return render(request, "item_detail.html", {"it": it, "events": events, "unlinked": unlinked,
-                                                "next_price": next_price})
+                                                "next_price": next_price,
+                                                "all_locations": db.query(Location).order_by(Location.name).all()})
 
 
 @router.get("/inventory/{iid}/edit")

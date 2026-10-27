@@ -4,6 +4,7 @@
 <div class="topbar">
   <div><h1>Inventory</h1><div class="sub">Everything you own — listed, unlisted (the “death pile”) and sold. {{ total }} shown.</div></div>
   <div class="row">
+    <a class="btn" href="/scan">📷 Scan shelf</a>
     <a class="btn" href="/inventory/quick-edit?{{ p|urlencode }}">Quick edit costs</a>
     <a class="btn primary" href="/inventory/new">+ Add item</a>
   </div>
@@ -30,7 +31,7 @@
     <td style="width:50px">{{ item_thumb(it) }}</td>
     <td class="trunc"><a href="/inventory/{{ it.id }}">{{ it.title }}</a>{% if it.sku %}<div class="muted small mono">{{ it.sku }}</div>{% endif %}</td>
     <td>{{ status_pill(it.status) }}</td>
-    <td>{{ it.storage_location or '—' }}</td>
+    <td>{% if it.location_id %}<a href="/locations/{{ it.location.code }}">{{ it.storage_location }}</a>{% else %}{{ it.storage_location or '—' }}{% endif %}</td>
     <td>{{ it.source or '—' }}</td>
     <td class="nowrap">{{ it.purchase_date|dt }}</td>
     <td class="r">{{ it.quantity - it.quantity_sold if it.status != 'sold' else it.quantity }}</td>

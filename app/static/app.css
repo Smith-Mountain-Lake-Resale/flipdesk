@@ -121,6 +121,7 @@ details summary{cursor:pointer;font-weight:600}
   .tbl{-webkit-overflow-scrolling:touch}
   .trunc{max-width:220px}
   .chart{height:220px}
+  .grid[style*="grid-template-columns"]{grid-template-columns:1fr!important}  /* inline 2-col layouts stack on phones */
 }
 @media (display-mode: standalone){
   body{-webkit-user-select:none;user-select:none}

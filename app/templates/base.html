@@ -31,6 +31,7 @@
     <button type="button" class="mnav" aria-label="Open menu" data-nav-toggle>☰</button>
     <a href="/" class="brand" style="padding:0"><span class="dot">⇄</span>{{ APP_NAME }}</a>
     <span class="spacer"></span>
+    <a href="/scan" class="mnav" aria-label="Scan a shelf label" style="font-size:19px;text-decoration:none">📷</a>
     {% if unread %}<a href="/notifications" class="badge" aria-label="{{ unread }} unread alerts">{{ unread }}</a>{% endif %}
   </header>
   <div class="scrim" data-nav-toggle></div>
@@ -40,6 +41,8 @@
       {{ nav('/', 'Dashboard') }}
       <div class="sec">Inventory</div>
       {{ nav('/inventory', 'Inventory') }}
+      {{ nav('/locations', 'Locations & labels') }}
+      {{ nav('/scan', '📷 Scan shelf label') }}
       {{ nav('/listings', 'eBay listings') }}
       {{ nav('/bulk-buys', 'Bulk buys') }}
       <div class="sec">Money</div>
