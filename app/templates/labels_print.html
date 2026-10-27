@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shelf labels · {{ APP_NAME }}</title>
+<link rel="stylesheet" href="/static/app.css?v={{ V }}">
+<style>
+  @page { size: {{ lay.pw }}in {{ lay.ph }}in; margin: 0; }
+  html, body { background: var(--bg); }
+  .toolbar { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 12px 16px; }
+  .toolbar form { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  .toolbar .field { margin: 0; }
+  .toolbar select, .toolbar input[type=number] { width: auto; }
+  .sheets { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px 16px 60px; justify-content: center; }
+  .page { position: relative; width: {{ lay.pw }}in; height: {{ lay.ph }}in; background: #fff; color: #000;
+          box-shadow: 0 2px 12px rgba(0,0,0,.18); overflow: hidden; flex: none; }
+  .cell { position: absolute; width: {{ lay.cw }}in; height: {{ lay.ch }}in; box-sizing: border-box; padding: {{ lay.pad }}in;
+          display: flex; overflow: hidden; font-family: Helvetica, Arial, sans-serif; }
+  .cell.stack { flex-direction: column; align-items: center; text-align: center; }
+  .cell.side { flex-direction: row; align-items: center; gap: {{ lay.pad }}in; }
+  .cell svg { width: {{ lay.qr }}in; height: {{ lay.qr }}in; flex: none; display: block; }
+  .cell .txt { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  .cell.stack .txt { margin-top: {{ (lay.pad * 0.6)|round(3) }}in; width: 100%; }
+  .cell .nm { font-weight: 700; line-height: 1.12; white-space: nowrap; }
+  .cell .cd { font-family: "Courier New", Courier, monospace; font-weight: 700; letter-spacing: .04em; line-height: 1; margin-top: .4em; }
+  .cell .sb { font-size: 0.8em; color: #222; margin-top: .15em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cut-v, .cut-h { position: absolute; border: 0 dashed #999; }
+  .cut-v { top: 0; bottom: 0; border-left-width: 0.75px; }
+  .cut-h { left: 0; right: 0; border-top-width: 0.75px; }
+  .tips { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  @media print {
+    html, body { background: #fff !important; }
+    .toolbar, .tips, .no-print { display: none !important; }
+    .sheets { display: block; padding: 0; gap: 0; }
+    .page { box-shadow: none; page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <form method="get">
+    <input type="hidden" name="ids" value="{{ opts.ids }}">{% if opts.all %}<input type="hidden" name="all" value="1">{% endif %}
+    <div class="field"><label>Layout</label><select name="layout" onchange="this.form.submit()">{% for k, v in layouts.items() %}<option value="{{ k }}" {{ 'selected' if k == lay.key }}>{{ v[0] }}</option>{% endfor %}</select></div>
+    <div class="field"><label>Copies each</label><input type="number" name="copies" min="1" max="50" value="{{ opts.copies }}" style="width:80px"></div>
+    <div class="field"><label>Skip spots</label><input type="number" name="skip" min="0" max="29" value="{{ opts.skip }}" style="width:80px"></div>
+    {% if lay.cut_lines %}<label class="check"><input type="checkbox" name="cut" value="1" {{ 'checked' if opts.cut }} onchange="this.form.cut0.disabled=this.checked;this.form.submit()"> Cut lines</label><input type="hidden" name="cut" value="0" id="cut0" {{ 'disabled' if opts.cut }}>{% endif %}
+    <button class="btn">Update</button>
+    <span class="spacer"></span>
+    <a class="btn" href="/locations/labels.pdf?{{ request.url.query }}" target="_blank" rel="noopener">⬇ PDF</a>
+    <button type="button" class="btn primary" onclick="window.print()">🖨 Print {{ count }} label{{ 's' if count != 1 }}</button>
+    <a class="btn" href="/locations">Done</a>
+  </form>
+</div>
+<div class="sheets">
+  {% for page in pages %}
+  <div class="page">
+    {% if lay.cut_lines and opts.cut %}
+      {% for i in range(1, lay.cols) %}<div class="cut-v" style="left:{{ lay.ml + i * lay.cw }}in"></div>{% endfor %}
+      {% for j in range(1, lay.rows) %}<div class="cut-h" style="top:{{ lay.mt + j * lay.ch }}in"></div>{% endfor %}
+    {% endif %}
+    {% for lab in page %}{% if lab %}
+      {% set col = loop.index0 % lay.cols %}{% set row = loop.index0 // lay.cols %}
+      <div class="cell {{ lay.style }}" style="left:{{ lay.ml + col * (lay.cw + lay.gx) }}in;top:{{ lay.mt + row * (lay.ch + lay.gy) }}in">
+        {{ lab.svg|safe }}
+        <div class="txt">
+          <div class="nm" style="font-size:{{ lab.name_pt }}pt">{% for ln in lab.lines %}{{ ln }}{% if not loop.last %}<br>{% endif %}{% endfor %}</div>
+          <div class="cd" style="font-size:{{ lab.code_pt }}pt">{{ lab.code }}</div>
+          {% if lab.show_sub %}<div class="sb" style="font-size:{{ (lab.code_pt * 0.85)|round(1) }}pt">{{ lab.sub }}</div>{% endif %}
+        </div>
+      </div>
+    {% endif %}{% endfor %}
+  </div>
+  {% endfor %}
+</div>
+<div class="tips small muted">
+  <p><b>Printing tips:</b> choose your label printer, set the paper size to <b>{{ lay.pw|round(2) }} × {{ lay.ph|round(2) }} in</b>, margins <b>None</b>, scale <b>100% / Actual size</b>, and turn off headers and footers.
+  If your browser or printer driver won't size it right (common with Safari and some thermal drivers), use <b>⬇ PDF</b> and print that at actual size.
+  {% if lay.cut_lines %}Cut along the dashed lines.{% endif %} Labels stay valid if you rename a location — the QR holds the code.</p>
+</div>
+</body></html>

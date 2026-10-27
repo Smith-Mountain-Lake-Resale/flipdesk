@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Scan{% endblock %}
+{% block content %}
+<div class="topbar">
+  <div><h1>📷 {% if mode == 'item' %}Scan a shelf for this item{% elif mode == 'put' %}Scan where you're putting things{% else %}Scan a shelf label{% endif %}</h1>
+    <div class="sub">{% if mode == 'item' %}<b>{{ item.title }}</b> — currently {{ item.storage_location or 'no location' }}{% elif mode == 'put' %}Then tick the items you're putting there.{% else %}Point your camera at a {{ APP_NAME }} QR label to see what's stored there.{% endif %}</div></div>
+  {% if mode == 'item' %}<a class="btn" href="/inventory/{{ item.id }}">Cancel</a>{% endif %}
+</div>
+<div class="scanner card" style="max-width:560px;padding:0;overflow:hidden">
+  <div class="scanbox" id="scanbox">
+    <video id="video" playsinline muted></video>
+    <div class="aim" aria-hidden="true"></div>
+    <div class="scanmsg" id="scanmsg">Starting camera…</div>
+  </div>
+  <div class="row" style="padding:10px 12px;gap:8px">
+    <button type="button" class="btn sm" id="torch" hidden>🔦 Light</button>
+    <button type="button" class="btn sm" id="flip" hidden>🔄 Switch camera</button>
+    <span class="spacer"></span>
+    <label class="btn sm" style="margin:0;font-size:12px;color:var(--ink)">🖼 Scan a photo<input type="file" id="photo" accept="image/*" capture="environment" hidden></label>
+  </div>
+</div>
+<div class="card" style="max-width:560px">
+  <form id="manual" class="row" autocomplete="off">
+    <input type="text" id="manualcode" placeholder="Or type the code on the label (e.g. L0007) or a location name" style="flex:1">
+    <button class="btn">Go</button>
+  </form>
+  <div class="flash err" id="scanerr" hidden style="margin-top:10px"></div>
+  <p class="small muted" style="margin-top:10px">Tip: your phone's regular camera app also works — scanning a label opens that location in {{ APP_NAME }}{% if mode == 'item' %} and moves this item there if you do it within 5 minutes{% endif %}.</p>
+</div>
+<style>
+  .scanbox{position:relative;background:#000;aspect-ratio:4/3;display:grid;place-items:center}
+  .scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+  .aim{position:absolute;inset:18% 24%;border:3px solid rgba(255,255,255,.85);border-radius:14px;box-shadow:0 0 0 999px rgba(0,0,0,.28)}
+  .scanbox.hit .aim{border-color:#3fae77}
+  .scanmsg{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;font-size:13px;text-shadow:0 1px 3px #000;padding:0 12px}
+</style>
+<script src="/static/jsQR.js?v={{ V }}" defer></script>
+<script>
+window.addEventListener('load', () => {
+  const MODE = {{ mode|tojson }}, ITEM = {{ (item.id if item else none)|tojson }};
+  const video = document.getElementById('video'), box = document.getElementById('scanbox'), msg = document.getElementById('scanmsg');
+  const err = document.getElementById('scanerr');
+  const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
+  let stream = null, busy = false, done = false, detector = null, facing = 'environment', last = '';
+  const csrf = document.querySelector('meta[name="csrf-token"]').content;
+
+  async function resolve(text) {
+    if (busy || done || !text) return;
+    if (text === last) return; last = text;
+    busy = true; box.classList.add('hit'); msg.textContent = 'Found code…'; err.hidden = true;
+    if (navigator.vibrate) navigator.vibrate(40);
+    try {
+      const r = await fetch('/scan/resolve', { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ text, mode: MODE, item: ITEM }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'Scan failed');
+      done = true; msg.textContent = '📍 ' + (j.location || 'Found'); stop();
+      location.href = j.redirect;
+    } catch (e) {
+      err.textContent = e.message; err.hidden = false; box.classList.remove('hit'); msg.textContent = 'Point at a FlipDesk shelf label';
+      setTimeout(() => { last = ''; }, 2500);
+    } finally { busy = false; }
+  }
+  function decodeFrom(source, w, h) {
+    canvas.width = w; canvas.height = h; ctx.drawImage(source, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h);
+    const code = window.jsQR && jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' });
+    return code ? code.data : null;
+  }
+  async function tick() {
+    if (done || !stream) return;
+    if (video.readyState >= 2 && !busy) {
+      try {
+        if (detector) {
+          const codes = await detector.detect(video);
+          if (codes.length) resolve(codes[0].rawValue);
+        } else {
+          const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
+          const t = decodeFrom(video, Math.round(video.videoWidth * scale), Math.round(video.videoHeight * scale));
+          if (t) resolve(t);
+        }
+      } catch (e) { /* keep scanning */ }
+    }
+    setTimeout(() => requestAnimationFrame(tick), detector ? 120 : 180);
+  }
+  function stop() { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; }
+  async function start() {
+    stop();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.isSecureContext) {
+      msg.textContent = 'Live camera needs HTTPS. Use “Scan a photo” or type the code below.'; return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false });
+      video.srcObject = stream; await video.play();
+      msg.textContent = 'Point at a FlipDesk shelf label';
+      const track = stream.getVideoTracks()[0];
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      const torch = document.getElementById('torch');
+      if (caps.torch) { torch.hidden = false; let on = false; torch.onclick = () => { on = !on; track.applyConstraints({ advanced: [{ torch: on }] }); }; }
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+      document.getElementById('flip').hidden = devs.length < 2;
+      tick();
+    } catch (e) {
+      msg.textContent = e.name === 'NotAllowedError' ? 'Camera permission was denied. Allow it in your browser settings, or use “Scan a photo”.' : 'No camera available. Use “Scan a photo” or type the code.';
+    }
+  }
+  (async () => {
+    if ('BarcodeDetector' in window) {
+      try { const f = await BarcodeDetector.getSupportedFormats(); if (f.includes('qr_code')) detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) {}
+    }
+    start();
+  })();
+  document.getElementById('flip').onclick = () => { facing = facing === 'environment' ? 'user' : 'environment'; start(); };
+  document.getElementById('photo').onchange = (ev) => {
+    const file = ev.target.files[0]; if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const t = decodeFrom(img, Math.round(img.width * scale), Math.round(img.height * scale));
+      if (t) { last = ''; resolve(t); } else { err.textContent = "Couldn't find a QR code in that photo — try again closer and in focus."; err.hidden = false; }
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+  };
+  document.getElementById('manual').onsubmit = (e) => { e.preventDefault(); last = ''; resolve(document.getElementById('manualcode').value.trim()); };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (!done) start(); });
+});
+</script>
+{% endblock %}

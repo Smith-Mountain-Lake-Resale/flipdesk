@@ -14,10 +14,19 @@
 {% set live = it.sales|rejectattr('status','equalto','cancelled')|list %}
 <div class="grid g4">
   <div class="card kpi"><div class="l">Cost</div><div class="v">{{ it.cost|money }}</div><div class="s">{{ it.quantity }} unit(s){% if it.quantity > 1 and it.unit_cost %} · {{ it.unit_cost|money }} each{% endif %}</div></div>
-  <div class="card kpi"><div class="l">Location</div><div class="v" style="font-size:18px">{{ it.storage_location or '—' }}</div><div class="s">Source: {{ it.source or '—' }}</div></div>
+  <div class="card kpi"><div class="l">Location</div><div class="v" style="font-size:18px">{% if it.location %}<a href="/locations/{{ it.location.code }}">📍 {{ it.location.name }}</a>{% else %}{{ it.storage_location or '—' }}{% endif %}</div>
+    <div class="s"><a href="/scan?mode=item&item={{ it.id }}">📷 Scan shelf</a> · <a href="#setloc" onclick="document.getElementById('setloc').open=true">change</a> · Source: {{ it.source or '—' }}</div></div>
   <div class="card kpi"><div class="l">Bought / listed</div><div class="v" style="font-size:18px">{{ it.purchase_date|dt }}</div><div class="s">Listed {{ it.listed_at|dt }}</div></div>
   <div class="card kpi"><div class="l">Net profit</div>{% set np = live|sum(attribute='net_profit') %}<div class="v {{ 'pos' if np >= 0 else 'neg' }}">{{ np|money if live else '—' }}</div><div class="s">{{ it.quantity_sold }} sold</div></div>
 </div>
+<details class="card" id="setloc" style="padding:12px 16px"><summary>📍 Set location</summary>
+  <form method="post" action="/inventory/{{ it.id }}/location" class="row" style="margin-top:10px">{{ csrf_input() }}
+    <input type="text" name="location" list="loclist" value="{{ it.storage_location or '' }}" placeholder="Pick or type a location (new names are created)" style="flex:1;min-width:200px">
+    <datalist id="loclist">{% for l in all_locations %}<option value="{{ l.name }}">{{ l.code }}</option>{% endfor %}</datalist>
+    <button class="btn">Save</button>
+    <a class="btn primary" href="/scan?mode=item&item={{ it.id }}">📷 Scan shelf label</a>
+  </form>
+</details>
 <div class="grid g2">
   <div>
     <div class="card" style="padding:0">
