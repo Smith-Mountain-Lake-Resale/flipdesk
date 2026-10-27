@@ -9,6 +9,74 @@ A self-hosted, web-based inventory and accounting application for eBay resellers
 <img width="1906" height="714" alt="image" src="https://github.com/user-attachments/assets/b0378289-c277-47d4-bdb2-32a730f1598f" />
 
 
+<img width="128" height="128" alt="swap-logo-128x128" src="https://github.com/user-attachments/assets/8e26c77a-9351-40f1-b91b-9570ab04b78e" />
+
+
+## Install with the prebuilt Docker image (recommended)
+
+Ready-made images are published to the GitHub Container Registry with every release — no need to clone the repo or build anything:
+
+**[`ghcr.io/smith-mountain-lake-resale/flipdesk`](https://github.com/Smith-Mountain-Lake-Resale/flipdesk/pkgs/container/flipdesk)**
+
+Images are tagged by release version (`v1.5.0`, `v1.4.0`, …); there is no `latest` tag, so always name a version. The examples below use `v1.5.0` — check the [package page](https://github.com/Smith-Mountain-Lake-Resale/flipdesk/pkgs/container/flipdesk) for the newest release.
+
+### Docker Compose (built-in SQLite)
+
+Create a folder with this `docker-compose.yml`:
+
+```yaml
+services:
+  flipdesk:
+    image: ghcr.io/smith-mountain-lake-resale/flipdesk:v1.5.0
+    container_name: flipdesk
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: America/New_York
+      PUID: 1000              # owner of files written to ./data and ./config
+      PGID: 1000
+      PUBLIC_URL: https://flip.example.com   # the HTTPS address eBay will redirect to
+    volumes:
+      - ./data:/data          # database, photos, receipts, backups
+      - ./config:/config      # config.yml (optional) + secret.key (auto-generated, keep it!)
+```
+
+Then start it:
+
+```bash
+mkdir -p data config
+docker compose pull
+docker compose up -d
+```
+
+Open `http://<host>:8080`, create the admin account, then follow **eBay connection** in the sidebar.
+
+### Plain `docker run`
+
+```bash
+docker run -d --name flipdesk -p 8080:8080 \
+  -e PUBLIC_URL=https://flip.example.com -e TZ=America/New_York -e PUID=1000 -e PGID=1000 \
+  -v /srv/flipdesk/data:/data -v /srv/flipdesk/config:/config \
+  --restart unless-stopped ghcr.io/smith-mountain-lake-resale/flipdesk:v1.5.0
+```
+
+### PostgreSQL or MariaDB/MySQL
+
+The bundled `docker-compose.postgres.yml` and `docker-compose.mariadb.yml` work with the prebuilt image too: replace `build: .` and `image: flipdesk:latest` in the `flipdesk` service with `image: ghcr.io/smith-mountain-lake-resale/flipdesk:v1.5.0`, then run `docker compose -f docker-compose.postgres.yml up -d`. All the other settings in [Environment variables](#environment-variables) apply unchanged.
+
+### Updating
+
+Change the version tag in your `docker-compose.yml` (or `docker run` command) to the new release, for example `v1.5.0` → `v1.6.0`, then:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Your data lives in `./data`, `./config` (and your external database, if used), so replacing the container loses nothing. Tables are upgraded automatically on start. Take a backup (*Import · export · backup → Download full export*) before jumping several versions.
+
+
 ## What it does
 
 | Area | Features |
@@ -41,7 +109,9 @@ Nothing stateful lives in the image. Destroying the container loses nothing.
 
 Settings precedence: **environment variable › `/config/config.yml` › value saved in the web UI › default.** Values set by env/file show as locked in the UI.
 
-## Quick start (built-in SQLite)
+## Build from source (built-in SQLite)
+
+Prefer the [prebuilt image](#install-with-the-prebuilt-docker-image-recommended) unless you're changing the code. To build the image yourself from a clone of this repo:
 
 ```bash
 mkdir -p data config
