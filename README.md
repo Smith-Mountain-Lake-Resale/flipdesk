@@ -4,16 +4,18 @@
 
 
 
+
+
+A self-hosted, web-based inventory and accounting application for eBay resellers: automatic eBay sync, real profit tracking, inventory, end-and-relist / repricing / delayed-promotion automations, error detection, expense and mileage ledger, income statement and a Schedule C–style tax report. One Docker container, your own eBay developer keys, your own database.
+
+> This application uses the eBay API but is not endorsed or certified by eBay, Inc. The tax report organizes your records; it isn't tax advice.
+
 ## Live demo
 
 
 Try FlipDesk in your browser before installing it: <a href="https://demo.flipdesk.me/" target="_blank" rel="noopener noreferrer"><strong>demo.flipdesk.me</strong></a> ↗
 
 
-
-A self-hosted, web-based inventory and accounting application for eBay resellers: automatic eBay sync, real profit tracking, inventory, end-and-relist / repricing / delayed-promotion automations, error detection, expense and mileage ledger, income statement and a Schedule C–style tax report. One Docker container, your own eBay developer keys, your own database.
-
-> This application uses the eBay API but is not endorsed or certified by eBay, Inc. The tax report organizes your records; it isn't tax advice.
 
 <img width="1906" height="714" alt="image" src="https://github.com/user-attachments/assets/b0378289-c277-47d4-bdb2-32a730f1598f" />
 
