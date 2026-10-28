@@ -1,6 +1,10 @@
-<img width="128" height="128" alt="swap-logo-128x128" src="https://github.com/user-attachments/assets/8e26c77a-9351-40f1-b91b-9570ab04b78e" />
+<img width="128" height="128" alt="swap-logo-128x128" src="https://raw.githubusercontent.com/Smith-Mountain-Lake-Resale/flipdesk/main/app/static/icons/icon-512.png" />
 
 # FlipDesk 
+
+## Live demo
+
+Try FlipDesk in your browser before installing it: <a href="https://demo.flipdesk.me/" target="_blank" rel="noopener noreferrer"><strong>demo.flipdesk.me</strong></a> ↗
 
 A self-hosted, web-based inventory and accounting application for eBay resellers: automatic eBay sync, real profit tracking, inventory, end-and-relist / repricing / delayed-promotion automations, error detection, expense and mileage ledger, income statement and a Schedule C–style tax report. One Docker container, your own eBay developer keys, your own database.
 
