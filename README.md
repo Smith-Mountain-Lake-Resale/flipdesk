@@ -2,9 +2,14 @@
 
 # FlipDesk 
 
+
+
 ## Live demo
 
+
 Try FlipDesk in your browser before installing it: <a href="https://demo.flipdesk.me/" target="_blank" rel="noopener noreferrer"><strong>demo.flipdesk.me</strong></a> ↗
+
+
 
 A self-hosted, web-based inventory and accounting application for eBay resellers: automatic eBay sync, real profit tracking, inventory, end-and-relist / repricing / delayed-promotion automations, error detection, expense and mileage ledger, income statement and a Schedule C–style tax report. One Docker container, your own eBay developer keys, your own database.
 
