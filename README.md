@@ -260,7 +260,6 @@ Settings changed this way apply within ~15 seconds; no restart needed. Environme
 | `AUTH_MODE` | `local` | `none` only behind an authenticating proxy |
 | `SESSION_COOKIE_SECURE` | `false` | `true` when served only over HTTPS |
 | `PORT` | `8080` | |
-
 | `MFA_REQUIRED` | `false` | require TOTP for everyone |
 | `MFA_REQUIRED_FOR_OIDC` | `false` | also require FlipDesk TOTP for SSO users |
 | `PASSKEYS_ENABLED` | `true` | allow passkeys for local accounts |
