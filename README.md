@@ -94,6 +94,7 @@ Your data lives in `./data`, `./config` (and your external database, if used), s
 | **Profit** | Per-sale net profit = price + shipping − fees − ads − label − refunds − cost of goods. Margin, ROI, avg days to list / sell. |
 | **Inventory** | Listed, unlisted (“death pile”) and sold items with cost, source, purchase date, storage location, photos. One item keeps its history across relisted item IDs (product timeline). Quick-edit grid for filling in costs fast. Auto-links when the eBay SKU matches. |
 | **Shelf labels & scanning** | Locations (shelves, bins, totes) with printable QR labels — 4, 6 or 8 per 4×6 thermal label with cut lines, one big label per 4×6, small-roll labels (4×2, 2.25×1.25, 2×1) or Letter sheets — each with the location name and code in plain text. Scan a label with the in-app camera scanner or your phone's camera to see what's on that shelf, put items away, or set an item's location. |
+| **Link listings ⇄ inventory** | Type to search instead of pasting eBay item numbers: from the inventory list or an item, find the eBay listing by title, SKU or item #; from the eBay listings page, find the inventory item by title, SKU, location or #id. Suggested matches appear before you type. Items FlipDesk auto-created from eBay are merged into the one you pick. |
 | **Inventory reconciliation** | Printable count sheet (PDF) of what's listed on eBay — item, SKU/eBay #, location, expected qty, tick box, counted-qty box and notes — grouped shelf by shelf so you can confirm everything is really there. |
 | **Bulk buys** | Track a lot / storage unit as one purchase, split the cost evenly or by value, watch ROI over time. |
 | **Any marketplace** | Record Amazon, Poshmark, Mercari, Etsy, Facebook, in-person sales alongside eBay. |
@@ -118,9 +119,7 @@ Nothing stateful lives in the image. Destroying the container loses nothing.
 
 Settings precedence: **environment variable › `/config/config.yml` › value saved in the web UI › default.** Values set by env/file show as locked in the UI.
 
-## Build from source (built-in SQLite)
-
-Prefer the [prebuilt image](#install-with-the-prebuilt-docker-image-recommended) unless you're changing the code. To build the image yourself from a clone of this repo:
+## Quick start (built-in SQLite)
 
 ```bash
 mkdir -p data config
@@ -195,6 +194,15 @@ Each label shows the location name in large bold text plus the code (and an opti
 
 Set **Public URL** before printing so the QR links point at the address your phone uses.
 
+## Linking eBay listings to inventory
+
+When a sync finds an eBay listing it can't match by SKU, FlipDesk creates a bare item for it. Link it to the item you logged when you bought it (with its cost, source and shelf) from either side:
+
+- **From inventory:** in the **eBay #** column, **🔗 Link eBay** on any in-stock item without a listing (or **🔗 Link an eBay listing** on the item page). Start typing part of the title, any words in any order, or a SKU or item number.
+- **From eBay listings:** the **Inventory item** column shows the linked item's #, cost and 📍 shelf, or **🔗 Link to inventory** if there isn't one. Search by title, SKU, location or `#id`. **↻ change** moves a listing to a different item.
+- **Suggested matches** with similar titles are shown as soon as you open the box. Use ↑ ↓ and Enter, or tap a result; on phones it opens as a bottom sheet.
+- **What happens:** if the listing belonged to an item FlipDesk auto-created, that item is merged into yours: earlier relisted item numbers, sales and timeline all move over, and your cost and location are kept. If it belonged to one of your real items, only the listing (and its sales) moves, and the old item goes back to unlisted. Sold items and auto-created items are left out of the inventory search.
+
 ## Inventory reconciliation (shelf count)
 
 **Inventory → Reconciliation sheet** prints a PDF to take round your shelves and confirm that what's listed on eBay is actually there.
@@ -260,6 +268,7 @@ Settings changed this way apply within ~15 seconds; no restart needed. Environme
 | `AUTH_MODE` | `local` | `none` only behind an authenticating proxy |
 | `SESSION_COOKIE_SECURE` | `false` | `true` when served only over HTTPS |
 | `PORT` | `8080` | |
+
 | `MFA_REQUIRED` | `false` | require TOTP for everyone |
 | `MFA_REQUIRED_FOR_OIDC` | `false` | also require FlipDesk TOTP for SSO users |
 | `PASSKEYS_ENABLED` | `true` | allow passkeys for local accounts |
@@ -293,4 +302,5 @@ python tests/test_auth.py  # TOTP, MFA enforcement, roles and OIDC against a loc
 python tests/test_passkeys_browser.py  # passkeys in Chromium with a virtual authenticator (needs Playwright)
 python tests/test_locations.py   # locations, label layouts (HTML + PDF, QR decode if OpenCV + pdftoppm) and scanning
 python tests/test_recon.py       # reconciliation sheet page + PDF
+python tests/test_linking.py     # type-to-search linking, suggestions and merging
 ```
