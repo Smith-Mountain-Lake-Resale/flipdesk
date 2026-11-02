@@ -155,3 +155,99 @@ document.addEventListener('DOMContentLoaded', () => {
     finally { btn.disabled = false; }
   }));
 });
+
+// ---------- Type-ahead search (link listings ⇄ inventory) ----------
+(() => {
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let uid = 0;
+  function init(box) {
+    if (box.dataset.taReady) return; box.dataset.taReady = '1';
+    const input = box.querySelector('.ta-input'), hidden = box.querySelector('.ta-value'), list = box.querySelector('.ta-list');
+    const go = box.closest('form') && box.closest('form').querySelector('.ta-go');
+    const url = box.dataset.taUrl; const lid = 'ta' + (++uid);
+    list.id = lid; input.setAttribute('aria-controls', lid);
+    let items = [], active = -1, timer = null, seq = 0;
+    async function load(q) {
+      const my = ++seq;
+      box.classList.add('ta-loading');
+      try {
+        const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'q=' + encodeURIComponent(q), { credentials: 'same-origin' });
+        if (!r.ok || my !== seq) return;
+        const j = await r.json();
+        if (my !== seq) return;
+        items = j.results || []; render(j.suggested, q);
+      } catch (e) { /* offline etc. */ } finally { if (my === seq) box.classList.remove('ta-loading'); }
+    }
+    function render(suggested, q) {
+      active = -1;
+      let html = '';
+      if (suggested && items.length) html += '<div class="ta-head">Suggested matches</div>';
+      if (!items.length) html += `<div class="ta-empty">${q ? 'No matches for “' + esc(q) + '”' : 'Type a title, SKU or number to search'}</div>`;
+      items.forEach((it, i) => {
+        html += `<div class="ta-opt" role="option" id="${lid}-${i}" data-i="${i}" aria-selected="false">` +
+          (it.img ? `<img src="${esc(it.img)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<span class="ta-noimg"></span>') +
+          `<span class="ta-txt"><span class="ta-label">${esc(it.label)}</span><span class="ta-sub">${esc(it.sub)}</span></span>` +
+          (it.badge ? `<span class="pill ta-badge">${esc(it.badge)}</span>` : '') + '</div>';
+      });
+      list.innerHTML = html; list.hidden = false; input.setAttribute('aria-expanded', 'true');
+    }
+    function hl(i) {
+      const opts = list.querySelectorAll('.ta-opt');
+      opts.forEach((o) => { o.classList.remove('on'); o.setAttribute('aria-selected', 'false'); });
+      if (i < 0 || i >= opts.length) { active = -1; input.removeAttribute('aria-activedescendant'); return; }
+      active = i; opts[i].classList.add('on'); opts[i].setAttribute('aria-selected', 'true');
+      input.setAttribute('aria-activedescendant', opts[i].id); opts[i].scrollIntoView({ block: 'nearest' });
+    }
+    function close() { list.hidden = true; input.setAttribute('aria-expanded', 'false'); }
+    function pick(i) {
+      const it = items[i]; if (!it) return;
+      hidden.value = it.value; input.value = it.label; close();
+      box.classList.add('ta-picked');
+      if (go) { go.disabled = false; go.focus(); }
+    }
+    list.addEventListener('mousedown', (e) => { const o = e.target.closest('.ta-opt'); if (o) { e.preventDefault(); pick(+o.dataset.i); } });
+    input.addEventListener('input', () => {
+      hidden.value = ''; box.classList.remove('ta-picked'); if (go) go.disabled = true;
+      clearTimeout(timer); timer = setTimeout(() => load(input.value.trim()), 180);
+    });
+    input.addEventListener('focus', () => { if (!hidden.value) load(input.value.trim()); });
+    input.addEventListener('blur', () => setTimeout(close, 120));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) load(input.value.trim()); else hl(Math.min(active + 1, items.length - 1)); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); hl(Math.max(active - 1, 0)); }
+      else if (e.key === 'Enter') { if (!list.hidden && active >= 0) { e.preventDefault(); pick(active); } else if (!hidden.value) e.preventDefault(); }
+      else if (e.key === 'Escape') { close(); }
+    });
+  }
+  const scan = (root) => (root || document).querySelectorAll('.ta').forEach(init);
+  document.addEventListener('DOMContentLoaded', () => scan());
+  // popovers (<details class="ta-pop">): focus the search box when opened
+  // Panels are positioned against the viewport so scrolling table containers can't clip them.
+  function place(d) {
+    const panel = d.querySelector('.ta-panel'); if (!panel) return;
+    if (window.matchMedia('(max-width:760px)').matches) { panel.style.cssText = ''; return; }  // bottom sheet on phones (CSS)
+    const r = d.querySelector('summary').getBoundingClientRect();
+    const w = Math.min(420, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(r.right - w, window.innerWidth - w - 12));
+    const below = window.innerHeight - r.bottom;
+    panel.style.position = 'fixed'; panel.style.width = w + 'px'; panel.style.left = left + 'px'; panel.style.right = 'auto';
+    if (below < 380 && r.top > below) { panel.style.top = 'auto'; panel.style.bottom = (window.innerHeight - r.top + 4) + 'px'; }
+    else { panel.style.bottom = 'auto'; panel.style.top = (r.bottom + 4) + 'px'; }
+  }
+  const openPops = () => document.querySelectorAll('details.ta-pop[open]');
+  document.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (d.matches && d.matches('details.ta-pop') && d.open) {
+      openPops().forEach((o) => { if (o !== d) o.open = false; });
+      scan(d); place(d);
+      const i = d.querySelector('.ta-input'); if (i) setTimeout(() => i.focus(), 30);
+    }
+  }, true);
+  window.addEventListener('resize', () => openPops().forEach(place));
+  document.addEventListener('scroll', () => openPops().forEach(place), true);
+  document.addEventListener('mousedown', (e) => openPops().forEach((d) => { if (!d.contains(e.target)) d.open = false; }));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') openPops().forEach((d) => { const l = d.querySelector('.ta-list'); if (!l || l.hidden) { d.open = false; d.querySelector('summary').focus(); } });
+  });
+  window.TypeAhead = { scan };
+})();

@@ -57,3 +57,15 @@
 {% elif it and it.image_url %}<img class="thumb" src="{{ it.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
 {% else %}<span class="thumb"></span>{% endif %}
 {%- endmacro %}
+
+{% macro typeahead(url, field, action, placeholder='Type to search…', button='Link', next=None) -%}
+<form method="post" action="{{ action }}{% if next %}?next={{ next|urlencode }}{% endif %}" class="ta-form">{{ csrf_input() }}
+  <div class="ta" data-ta-url="{{ url }}">
+    <input type="search" class="ta-input" placeholder="{{ placeholder }}" autocomplete="off" spellcheck="false"
+           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-label="{{ placeholder }}">
+    <input type="hidden" name="{{ field }}" class="ta-value">
+    <div class="ta-list" role="listbox" hidden></div>
+  </div>
+  <button class="btn sm primary ta-go" disabled>{{ button }}</button>
+</form>
+{%- endmacro %}
