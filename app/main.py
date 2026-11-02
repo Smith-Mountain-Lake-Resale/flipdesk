@@ -35,6 +35,17 @@ async def lifespan(app: FastAPI):
             print(f"[locations] linked {n} item(s) to shelf locations")
     finally:
         db.close()
+    from .services import sync as syncsvc
+    db = SessionLocal()
+    try:
+        n = syncsvc.repair_charge_attribution(db)
+        if n:
+            print(f"[finances] attached ad / separately-billed fees to {n} order(s)")
+    except Exception as exc:  # never block startup
+        db.rollback()
+        print(f"[finances] fee attribution check skipped: {exc}")
+    finally:
+        db.close()
     from .services import scheduler
     scheduler.start()
     print(f"[{config.APP_NAME}] v{config.APP_VERSION} ready — database: {config.redacted_db_url()}")
