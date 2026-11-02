@@ -91,7 +91,7 @@ Your data lives in `./data`, `./config` (and your external database, if used), s
 | Area | Features |
 |---|---|
 | **eBay sync** | Active listings (Trading API), orders with a 2-year backfill (Fulfillment API), fees, shipping labels, ad fees, credits and store subscriptions (Finances API). Runs on a schedule; “Sync now” buttons too. |
-| **Profit** | Per-sale net profit = price + shipping − fees − ads − label − refunds − cost of goods. Margin, ROI, avg days to list / sell. |
+| **Profit** | Per-sale net profit = price + shipping − fees − ads − label − refunds − cost of goods. Promoted Listings ad fees (and their credits) are matched to the order they were charged for; only charges with no matching order (store subscription, insertion fees, ads on orders outside the sync window) go to Expenses. Margin, ROI, avg days to list / sell. |
 | **Inventory** | Listed, unlisted (“death pile”) and sold items with cost, source, purchase date, storage location, photos. One item keeps its history across relisted item IDs (product timeline). Quick-edit grid for filling in costs fast. Auto-links when the eBay SKU matches. |
 | **Shelf labels & scanning** | Locations (shelves, bins, totes) with printable QR labels — 4, 6 or 8 per 4×6 thermal label with cut lines, one big label per 4×6, small-roll labels (4×2, 2.25×1.25, 2×1) or Letter sheets — each with the location name and code in plain text. Scan a label with the in-app camera scanner or your phone's camera to see what's on that shelf, put items away, or set an item's location. |
 | **Link listings ⇄ inventory** | Type to search instead of pasting eBay item numbers: from the inventory list or an item, find the eBay listing by title, SKU or item #; from the eBay listings page, find the inventory item by title, SKU, location or #id. Suggested matches appear before you type. Items FlipDesk auto-created from eBay are merged into the one you pick. |
@@ -302,4 +302,5 @@ python tests/test_passkeys_browser.py  # passkeys in Chromium with a virtual aut
 python tests/test_locations.py   # locations, label layouts (HTML + PDF, QR decode if OpenCV + pdftoppm) and scanning
 python tests/test_recon.py       # reconciliation sheet page + PDF
 python tests/test_linking.py     # type-to-search linking, suggestions and merging
+python tests/test_adfees.py      # promoted-listing ad fees matched to their sales
 ```
