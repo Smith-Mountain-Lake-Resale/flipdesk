@@ -392,6 +392,7 @@ def sync_finances(db: Session, acct: EbayAccount) -> str:
             if not txns or offset >= int(data.get("total", 0)):
                 break
         win_start = win_end
+    touched_orders |= attribute_charges(db)
     for oid in touched_orders:
         apply_finances_to_order(db, oid)
     _non_order_charges_to_ledger(db)
@@ -399,6 +400,43 @@ def sync_finances(db: Session, acct: EbayAccount) -> str:
     acct.finances_backfill_done = True
     db.commit()
     return f"{len(seen)} finance transactions, {len(touched_orders)} orders updated"
+
+
+_LEGACY_ORDER = re.compile(r"^(\d{9,})-(\d{9,})$")   # old-style order ID: <item id>-<transaction id>
+
+
+def _refs(t: dict, *types: str) -> list[str]:
+    want = {x.upper() for x in types}
+    return [str(r.get("referenceId")) for r in t.get("references", []) or []
+            if (r.get("referenceType") or "").upper() in want and r.get("referenceId")]
+
+
+def _sale_for_item(db: Session, item_id: str, when: datetime | None) -> Sale | None:
+    q = db.query(Sale).filter(Sale.marketplace == "eBay", Sale.ebay_item_id == item_id)
+    if when is not None:
+        q = q.filter(Sale.sale_date <= when + timedelta(days=1))
+    return q.order_by(Sale.sale_date.desc()).first()
+
+
+def _resolve_order_id(db: Session, t: dict, when: datetime | None) -> str | None:
+    """The order a finance transaction belongs to.
+
+    SALE/REFUND/label transactions carry `orderId`, but charges billed separately — Promoted
+    Listings ad fees (NON_SALE_CHARGE / AD_FEE), and some final value fees — usually leave it
+    empty and name the order (or only the item) in `references` instead."""
+    if t.get("orderId"):
+        return t["orderId"]
+    for oid in _refs(t, "ORDER_ID", "ORDER"):
+        if db.query(Sale.id).filter_by(marketplace="eBay", order_id=oid).first():
+            return oid
+        m = _LEGACY_ORDER.match(oid)
+        if m and (s := _sale_for_item(db, m.group(1), when)):
+            return s.order_id
+        return oid          # order not synced (yet) — kept, and expensed until it is
+    for iid in _refs(t, "ITEM_ID", "ITEM"):
+        if s := _sale_for_item(db, iid, when):
+            return s.order_id
+    return None
 
 
 def _upsert_txn(db: Session, t: dict) -> str | None:
@@ -410,7 +448,7 @@ def _upsert_txn(db: Session, t: dict) -> str | None:
         row = FinanceTransaction(transaction_id=tid, transaction_type=ttype)
         db.add(row)
     row.booking_entry = t.get("bookingEntry")
-    row.order_id = t.get("orderId")
+    row.order_id = _resolve_order_id(db, t, parse_iso(t.get("transactionDate")))
     row.amount = _amt(t.get("amount"))
     row.currency = (t.get("amount") or {}).get("currency")
     row.fee_amount = _amt(t.get("totalFeeAmount"))
@@ -475,12 +513,61 @@ def apply_finances_to_order(db: Session, order_id: str) -> None:
     db.flush()
 
 
-def _non_order_charges_to_ledger(db: Session) -> None:
-    """Store subscriptions, insertion fees, unattributed ad fees → expense ledger."""
-    rows = db.query(FinanceTransaction).filter(
-        FinanceTransaction.order_id.is_(None),
-        FinanceTransaction.transaction_type.in_(("NON_SALE_CHARGE",))).all()
+CHARGE_TYPES = ("NON_SALE_CHARGE", "CREDIT", "ADJUSTMENT")
+
+
+def _sale_orders(db: Session) -> set[str]:
+    return {o for (o,) in db.query(Sale.order_id).filter(Sale.marketplace == "eBay").distinct() if o}
+
+
+def attribute_charges(db: Session) -> set[str]:
+    """Tie separately-billed charges (ad fees etc.) to their orders.
+
+    Re-reads stored transactions that have no order, or whose order wasn't synced when they
+    arrived, and removes the "unattributed" expense rows created for them earlier. Returns the
+    order IDs whose totals need recalculating."""
+    orders = _sale_orders(db)
+    touched: set[str] = set()
+    rows = db.query(FinanceTransaction).filter(FinanceTransaction.transaction_type.in_(CHARGE_TYPES)).all()
     for t in rows:
+        if t.order_id is None or t.order_id not in orders:
+            try:
+                raw = json.loads(t.raw or "{}")
+            except ValueError:
+                raw = {}
+            oid = _resolve_order_id(db, raw, t.transaction_date) if raw else None
+            if oid and oid != t.order_id:
+                t.order_id = oid
+                if oid in orders:
+                    touched.add(oid)
+        if t.order_id and t.order_id in orders:
+            exp = db.query(Expense).filter_by(external_ref=f"ebay:{t.transaction_type}:{t.transaction_id}",
+                                              source="ebay_sync").first()
+            if exp is not None:
+                db.delete(exp)
+                touched.add(t.order_id)
+    db.flush()
+    return touched
+
+
+def repair_charge_attribution(db: Session) -> int:
+    """Startup fix-up for data synced by older versions (ad fees left in expenses)."""
+    touched = attribute_charges(db)
+    for oid in touched:
+        apply_finances_to_order(db, oid)
+    db.commit()
+    return len(touched)
+
+
+def _non_order_charges_to_ledger(db: Session) -> None:
+    """Store subscriptions, insertion fees, ad fees not tied to a synced order → expense ledger."""
+    orders = _sale_orders(db)
+    rows = db.query(FinanceTransaction).filter(FinanceTransaction.transaction_type.in_(CHARGE_TYPES)).all()
+    for t in rows:
+        if t.order_id and t.order_id in orders:
+            continue
+        if t.transaction_type != "NON_SALE_CHARGE" and not _is_ad(t.fee_type, t.memo):
+            continue    # stray credits/adjustments stay out of the ledger unless they're ad-fee credits
         ref = f"ebay:{t.transaction_type}:{t.transaction_id}"
         if db.query(Expense.id).filter_by(external_ref=ref).first():
             continue
