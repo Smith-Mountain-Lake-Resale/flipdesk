@@ -92,7 +92,8 @@ TXNS = [
      "orderLineItems": [{"lineItemId": "L1", "marketplaceFees": [{"feeType": "FINAL_VALUE_FEE", "amount": {"value": "3.80"}}, {"feeType": "FINAL_VALUE_FEE_FIXED_PER_ORDER", "amount": {"value": "0.30"}}]}]},
     {"transactionId": "T2", "transactionType": "SHIPPING_LABEL", "bookingEntry": "DEBIT", "orderId": "01-111", "amount": {"value": "4.50"}, "transactionDate": iso(NOW - timedelta(days=2))},
     {"transactionId": "T3", "transactionType": "SHIPPING_LABEL", "bookingEntry": "DEBIT", "orderId": "01-111", "amount": {"value": "4.50"}, "transactionDate": iso(NOW - timedelta(days=2))},
-    {"transactionId": "T4", "transactionType": "NON_SALE_CHARGE", "bookingEntry": "DEBIT", "orderId": "01-111", "feeType": "AD_FEE", "amount": {"value": "1.20"}, "transactionDate": iso(NOW - timedelta(days=3))},
+    {"transactionId": "T4", "transactionType": "NON_SALE_CHARGE", "bookingEntry": "DEBIT", "feeType": "AD_FEE",
+     "references": [{"referenceId": "01-111", "referenceType": "ORDER_ID"}, {"referenceId": "110000000001", "referenceType": "ITEM_ID"}], "amount": {"value": "1.20"}, "transactionDate": iso(NOW - timedelta(days=3))},
     {"transactionId": "T5", "transactionType": "NON_SALE_CHARGE", "bookingEntry": "DEBIT", "feeType": "SUBSCRIPTION_FEE", "amount": {"value": "21.95"}, "transactionDate": iso(NOW - timedelta(days=10))},
     {"transactionId": "T6", "transactionType": "CREDIT", "bookingEntry": "CREDIT", "orderId": "01-333", "feeType": "FINAL_VALUE_FEE", "amount": {"value": "1.00"}, "transactionDate": iso(NOW - timedelta(days=99))},
 ]
