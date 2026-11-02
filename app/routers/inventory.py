@@ -265,35 +265,6 @@ async def item_writeoff(iid: int, request: Request, db: Session = Depends(get_db
     return redirect(f"/inventory/{iid}", request, msg)
 
 
-@router.post("/inventory/{iid}/link")
-async def item_link(iid: int, request: Request, db: Session = Depends(get_db)):
-    f = await form(request)
-    it = db.get(Item, iid)
-    lst = db.query(Listing).filter_by(ebay_item_id=(f.get("ebay_item_id") or "").strip()).first()
-    if not it or not lst:
-        return redirect(f"/inventory/{iid}", request, "Listing not found — sync listings first.", "err")
-    old = lst.item
-    lst.item_id = it.id
-    it.current_ebay_item_id = lst.ebay_item_id
-    it.original_price = it.original_price or lst.price
-    it.image_url = it.image_url or lst.image_url
-    for s in db.query(Sale).filter_by(ebay_item_id=lst.ebay_item_id).all():
-        s.item_id = it.id
-    db.flush()
-    if old and old.id != it.id and not old.cost and not old.sales and len(old.listings) <= 1:
-        # auto-created placeholder from eBay — merge its timeline into this item
-        for ev in db.query(ItemEvent).filter_by(item_id=old.id).all():
-            ev.item_id = it.id
-        db.flush()
-        db.delete(old)
-    add_event(db, it, "linked", f"Linked to eBay listing {lst.ebay_item_id}", lst.ebay_item_id)
-    db.flush()
-    db.refresh(it)
-    refresh_item_status(db, it)
-    db.commit()
-    return redirect(f"/inventory/{iid}", request, "Linked to listing.")
-
-
 @router.post("/inventory/{iid}/note")
 async def item_note(iid: int, request: Request, db: Session = Depends(get_db)):
     f = await form(request)
@@ -312,20 +283,11 @@ async def item_merge(iid: int, request: Request, db: Session = Depends(get_db)):
     other = db.get(Item, int(to_float(f.get("other_id"), 0) or 0))
     if not it or not other or other.id == it.id:
         return redirect(f"/inventory/{iid}", request, "Item to merge not found.", "err")
-    for lst in list(other.listings):
-        lst.item_id = it.id
-    for s in list(other.sales):
-        s.item_id = it.id
-    for ev in db.query(ItemEvent).filter_by(item_id=other.id).all():
-        ev.item_id = it.id
-    for field in ("cost", "source", "purchase_date", "storage_location", "sku", "image_url", "original_price"):
-        if getattr(it, field) is None and getattr(other, field) is not None:
-            setattr(it, field, getattr(other, field))
-    db.flush()
-    db.delete(other)
-    db.flush()
+    from ..services.linking import merge_items
+    other_id = other.id
+    merge_items(db, it, other)
     db.refresh(it)
-    add_event(db, it, "merged", f"Merged item #{other.id} into this item")
+    add_event(db, it, "merged", f"Merged item #{other_id} into this item")
     refresh_item_status(db, it)
     db.commit()
     return redirect(f"/inventory/{iid}", request, "Items merged.")
